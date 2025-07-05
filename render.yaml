@@ -1,0 +1,33 @@
+# render.yaml
+# This file tells Render how to deploy your project.
+
+services:
+  # 1. The Web Service for your Flask API
+  - type: web
+    name: scraping-sia-api  # You can change this name
+    env: python
+    # Build commands tell Render how to install dependencies
+    buildCommand: "pip install -r requirements.txt"
+    # Start command tells Render how to run your app
+    startCommand: "gunicorn app:app"
+    # Connect the persistent disk to store your scraped data
+    disks:
+      - name: data-storage
+        mountPath: /app/scraped_data
+        sizeGB: 1
+
+  # 2. The Cron Job to run your scraper
+  - type: cron
+    name: sia-scraper # You can change this name
+    env: python
+    # Schedule to run at the start of every hour
+    schedule: "0 * * * *"
+    # CRITICAL: playwright install downloads the necessary browser
+    buildCommand: "pip install -r requirements.txt && playwright install"
+    # Command to run on schedule
+    command: "python Scraper.py"
+    # Connect the SAME persistent disk
+    disks:
+      - name: data-storage
+        mountPath: /app/scraped_data
+        sizeGB: 1
