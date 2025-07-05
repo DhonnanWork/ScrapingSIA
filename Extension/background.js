@@ -1,0 +1,1 @@
+// Dummy background script for Firefox Manifest V2 compatibility. 

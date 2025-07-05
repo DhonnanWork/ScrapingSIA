@@ -1,0 +1,6 @@
+playwright
+google-generativeai
+python-dotenv
+Flask
+Flask-Cors
+gunicorn

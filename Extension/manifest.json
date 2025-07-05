@@ -1,0 +1,32 @@
+{
+  "manifest_version": 2,
+  "name": "SIA Quick Access",
+  "version": "1.0",
+  "description": "Quickly access SIA course files and assignments.",
+  "permissions": ["storage", "tabs", "https://sia.polytechnic.astra.ac.id/*"],
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icon-16.ico",
+    "32": "icon-32.ico",
+    "48": "icon-48.ico",
+    "128": "icon-128.ico"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://sia.polytechnic.astra.ac.id/Page_Pelaksanaan_Aktivitas_Pembelajaran_Detail.aspx*"],
+      "js": ["autonavigate.js"],
+      "run_at": "document_end"
+    }
+  ]
+} 

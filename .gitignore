@@ -1,0 +1,25 @@
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE and OS files
+.vscode/
+.idea/
+*.DS_Store
+
+# Log and temporary files
+*.log
+*.swp
+captcha.png
+critical_error_page.png
+scraper_state.json
+
+# Browser extension build files
+*.crx
+*.pem
+
+# Render persistent disk placeholder
+scraped_data/
