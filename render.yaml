@@ -4,7 +4,7 @@
 services:
   # 1. The Web Service for your Flask API
   - type: web
-    name: scraping-sia-api  # You can change this name
+    name: scraping-sia-api
     env: python
     # Build commands tell Render how to install dependencies
     buildCommand: "pip install -r requirements.txt"
@@ -14,20 +14,20 @@ services:
     disks:
       - name: data-storage
         mountPath: /app/scraped_data
+        # The size is only defined the first time the disk is mentioned
         sizeGB: 1
 
   # 2. The Cron Job to run your scraper
   - type: cron
-    name: sia-scraper # You can change this name
+    name: sia-scraper
     env: python
     # Schedule to run at the start of every hour
     schedule: "0 * * * *"
-    # CRITICAL: playwright install downloads the necessary browser
+    # Build command for the cron job
     buildCommand: "pip install -r requirements.txt && playwright install"
     # Command to run on schedule
     command: "python Scraper.py"
-    # Connect the SAME persistent disk
+    # Connect the SAME persistent disk (size is not needed here)
     disks:
       - name: data-storage
         mountPath: /app/scraped_data
-        sizeGB: 1
