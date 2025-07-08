@@ -15,7 +15,6 @@ __pycache__/
 *.swp
 captcha.png
 critical_error_page.png
-scraper_state.json
 
 # Browser extension build files
 *.crx
