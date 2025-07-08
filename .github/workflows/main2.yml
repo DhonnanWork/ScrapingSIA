@@ -1,0 +1,72 @@
+# A descriptive name for your workflow, shown in the Actions tab
+name: SIA Polman Astra Scraper
+
+# --- How the workflow is triggered ---
+on:
+  # 1. Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+  # 2. Runs the workflow on a schedule
+  schedule:
+    # This is a CRON schedule. This example runs at 23:00 UTC every day.
+    # (That's 6:00 AM WIB in Indonesia).
+    # Use a crontab generator like https://crontab.guru/ to create your own schedule.
+    - cron: '0 23 * * *'
+
+# --- The actual job(s) to run ---
+jobs:
+  scrape_data:
+    # The type of virtual machine to run the job on. 'ubuntu-latest' is perfect.
+    runs-on: ubuntu-latest
+
+    # The sequence of steps to perform
+    steps:
+      # Step 1: Check out your repository code
+      # This downloads your scraper.py and requirements.txt to the runner
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python
+      # This installs a specific version of Python on the runner
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # You can use 3.9, 3.10, etc.
+
+      # Step 3: Install Python dependencies
+      # Reads your requirements.txt and installs the packages
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Install Playwright's browser
+      # This is the crucial step that was difficult on Termux
+      - name: Install Playwright Browsers
+        run: playwright install firefox --with-deps
+
+      # Step 5: Run the scraper script
+      # It uses the secrets you created as environment variables
+      - name: Run the Python Scraper
+        env:
+          NIM: ${{ secrets.NIM }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python Scraper.py
+
+      # Step 6: Commit the scraped data back to the repository
+      # This step finds any new/changed files (scraped_data/*, scraper_state.json)
+      # and pushes them to your repo.
+      - name: Commit and Push Scraped Files
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "github-actions-bot@github.com"
+          git add scraped_data/
+          git add scraper_state.json
+          # Check if there are any changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "📊 Automated Scrape: Update data files"
+            git push
+          fi
