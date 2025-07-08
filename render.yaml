@@ -1,19 +1,24 @@
+disks:
+  - name: data-storage
+    mountPath: /app/scraped_data
+    sizeGB: 1
+
 services:
   - type: web
     name: scraping-sia-api
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
-    disks:
-      - name: data-storage
-        mountPath: /app/scraped_data
-        sizeGB: 1
+    disk:
+      name: data-storage
+      mountPath: /app/scraped_data
+
   - type: cron
     name: sia-scraper
     env: python
     schedule: "0 * * * *"
     buildCommand: "pip install -r requirements.txt && playwright install"
     command: "python Scraper.py"
-    disks:
-      - name: data-storage
-        mountPath: /app/scraped_data
+    disk:
+      name: data-storage
+      mountPath: /app/scraped_data
