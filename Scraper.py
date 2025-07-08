@@ -272,9 +272,12 @@ def run_scraper():
                     if page.url.startswith(LOGIN_URL) and is_captcha_visible:
                         try:
                             refresh_button = page.locator("#MainContent_btnRefreshCaptcha")
-                            refresh_button.wait_for(state="visible", timeout=1000)
-                            refresh_button.click()
-                            time.sleep(1)
+                            try:
+                                refresh_button.wait_for(state="visible", timeout=1000)
+                                refresh_button.click()
+                                time.sleep(1)
+                            except PlaywrightTimeoutError:
+                                pass
                         except Exception:
                             pass
                     elif not page.url.startswith(LOGIN_URL):
