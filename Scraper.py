@@ -213,41 +213,68 @@ def run_scraper():
                         break
                     else:
                         error_message_locator = page.locator("#MainContent_lblMessage[style*='color:Red']")
-                        if error_message_locator.is_visible(timeout=1000):
+                        try:
+                            error_message_locator.wait_for(state="visible", timeout=1000)
+                            is_visible = True
+                        except PlaywrightTimeoutError:
+                            is_visible = False
+                        if is_visible:
                             error_text = error_message_locator.text_content(timeout=1000)
                             if error_text:
                                 error_text = error_text.lower()
                             print(f"Login error: {error_text}")
-                        elif page.locator("#txtCaptcha").is_visible(timeout=1000):
-                             print("CAPTCHA verification failed.")
                         else:
-                            print(f"Login status unclear. URL: {page.url}")
+                            try:
+                                page.locator("#txtCaptcha").wait_for(state="visible", timeout=1000)
+                                is_captcha_visible = True
+                            except PlaywrightTimeoutError:
+                                is_captcha_visible = False
+                            if is_captcha_visible:
+                                print("CAPTCHA verification failed.")
+                            else:
+                                print(f"Login status unclear. URL: {page.url}")
 
                 except PlaywrightTimeoutError:
                     print("Timeout waiting for URL change.")
                     error_message_locator = page.locator("#MainContent_lblMessage[style*='color:Red']")
-                    if error_message_locator.is_visible(timeout=1000):
+                    try:
+                        error_message_locator.wait_for(state="visible", timeout=1000)
+                        is_visible = True
+                    except PlaywrightTimeoutError:
+                        is_visible = False
+                    if is_visible:
                         error_text = error_message_locator.text_content(timeout=1000)
                         if error_text:
                             error_text = error_text.lower()
                         print(f"Login error: {error_text}")
-                    elif page.locator("#txtCaptcha").is_visible(timeout=1000):
-                         print("CAPTCHA verification failed.")
                     else:
-                        print(f"Login status unclear after timeout. URL: {page.url}")
-                        if (page.url.startswith(SIA_BASE_URL) and "default.aspx" in page.url.lower()) or \
-                           (page.url.startswith(SSO_BASE_URL) and "default.aspx" in page.url.lower()):
-                            login_success = True
-                            break
+                        try:
+                            page.locator("#txtCaptcha").wait_for(state="visible", timeout=1000)
+                            is_captcha_visible = True
+                        except PlaywrightTimeoutError:
+                            is_captcha_visible = False
+                        if is_captcha_visible:
+                            print("CAPTCHA verification failed.")
+                        else:
+                            print(f"Login status unclear after timeout. URL: {page.url}")
+                            if (page.url.startswith(SIA_BASE_URL) and "default.aspx" in page.url.lower()) or \
+                               (page.url.startswith(SSO_BASE_URL) and "default.aspx" in page.url.lower()):
+                                login_success = True
+                                break
 
                 if attempt < MAX_CAPTCHA_ATTEMPTS - 1 and not login_success:
                     print("Retrying login...")
-                    if page.url.startswith(LOGIN_URL) and page.locator("#txtCaptcha").is_visible(timeout=1000):
+                    try:
+                        page.locator("#txtCaptcha").wait_for(state="visible", timeout=1000)
+                        is_captcha_visible = True
+                    except PlaywrightTimeoutError:
+                        is_captcha_visible = False
+                    if page.url.startswith(LOGIN_URL) and is_captcha_visible:
                         try:
                             refresh_button = page.locator("#MainContent_btnRefreshCaptcha")
-                            if refresh_button.is_visible(timeout=1000):
-                                refresh_button.click()
-                                time.sleep(1)
+                            refresh_button.wait_for(state="visible", timeout=1000)
+                            refresh_button.click()
+                            time.sleep(1)
                         except Exception:
                             pass
                     elif not page.url.startswith(LOGIN_URL):
@@ -290,7 +317,12 @@ def run_scraper():
             pelaksanaan_perkuliahan_header = page.locator("a:has-text('Pelaksanaan Perkuliahan')")
             aktivitas_pembelajaran_link = page.locator("a:has-text('– Aktivitas Pembelajaran')")
 
-            if not aktivitas_pembelajaran_link.is_visible(timeout=5000):
+            try:
+                aktivitas_pembelajaran_link.wait_for(state="visible", timeout=5000)
+                is_aktivitas_visible = True
+            except PlaywrightTimeoutError:
+                is_aktivitas_visible = False
+            if not is_aktivitas_visible:
                 print("Expanding section...")
                 pelaksanaan_perkuliahan_header.click()
                 page.wait_for_timeout(1000)
@@ -535,7 +567,7 @@ def run_scraper():
                                                 except Exception as e:
                                                     print(f"          Error scraping tugas card: {e}")
                                             kembali_btn = page.locator("#MainContent_btnCancelTugas")
-                                            if kembali_btn.is_visible(timeout=5000):
+                                            if kembali_btn.is_visible():
                                                 print("        Returning to pertemuan list by pressing 'Kembali'...")
                                                 with page.expect_navigation(wait_until="networkidle", timeout=30000):
                                                     kembali_btn.click()
@@ -573,7 +605,7 @@ def run_scraper():
 
                 # Navigate back
                 back_button = page.locator("#MainContent_btnCancelDetail")
-                if back_button.is_visible(timeout=5000):
+                if back_button.is_visible():
                     print("  Returning to courses list...")
                     with page.expect_navigation(wait_until="networkidle", timeout=30000):
                         back_button.click()
