@@ -1,0 +1,35 @@
+# render.yaml - Based on official Render Blueprint Specification
+# https://render.com/docs/blueprint-spec
+
+# Define all shared resources at the top level for clarity and robustness.
+# This 'disks' block creates the persistent disk resource for the entire blueprint.
+disks:
+  - name: data-storage
+    mountPath: /app/scraped_data
+    sizeGB: 1
+
+# Define all services that will use the resources.
+services:
+  # 1. The Web Service for the Flask API
+  - type: web
+    name: scraping-sia-api
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    # Attach the disk defined at the top level using the 'disk' (singular) key.
+    disk:
+      name: data-storage
+      # The mountPath must be repeated to tell this specific service where to mount it.
+      mountPath: /app/scraped_data
+
+  # 2. The Cron Job for the scraper
+  - type: cron
+    name: sia-scraper
+    env: python
+    schedule: "0 * * * *"
+    buildCommand: "pip install -r requirements.txt && playwright install"
+    command: "python Scraper.py"
+    # Attach the exact same disk to this service.
+    disk:
+      name: data-storage
+      mountPath: /app/scraped_data
