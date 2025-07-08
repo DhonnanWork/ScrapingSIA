@@ -52,7 +52,7 @@ jobs:
           NIM: ${{ secrets.NIM }}
           PASSWORD: ${{ secrets.PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python scraper.py
+        run: python Scraper.py
 
       # Step 6: Commit the scraped data back to the repository
       # This step finds any new/changed files (scraped_data/*, scraper_state.json)
