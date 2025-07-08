@@ -18,6 +18,7 @@ jobs:
   scrape_data:
     # The type of virtual machine to run the job on. 'ubuntu-latest' is perfect.
     runs-on: ubuntu-latest
+    environment: Dorothy
 
     # The sequence of steps to perform
     steps:
