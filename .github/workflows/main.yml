@@ -56,7 +56,7 @@ jobs:
 
       # Step 6: Commit the scraped data back to the repository
       # This step finds any new/changed files (scraped_data/*, scraper_state.json)
-      # and pushes them to your repo.
+      # and pushes them to your repo .
       - name: Commit and Push Scraped Files
         run: |
           git config --global user.name "GitHub Actions Bot"
