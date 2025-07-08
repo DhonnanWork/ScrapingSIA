@@ -110,7 +110,12 @@ def login_to_sia(page):
             return True
         except PlaywrightTimeoutError:
             error_message = page.locator("#MainContent_lblMessage[style*='color:Red']")
-            if error_message.is_visible(timeout=500):
+            try:
+                error_message.wait_for(state="visible", timeout=500)
+                is_visible = True
+            except PlaywrightTimeoutError:
+                is_visible = False
+            if is_visible:
                 print(f"Login error: {error_message.text_content().strip()}")
             else:
                 print("Login failed. Incorrect CAPTCHA or other issue.")
