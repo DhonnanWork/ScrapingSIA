@@ -1,73 +1,99 @@
-# A descriptive name for your workflow, shown in the Actions tab
-name: SIA Polman Astra Scraper
+# A friendly name for the workflow, which will be displayed in the GitHub Actions tab.
+name: Run SIA Scraper
 
-# --- How the workflow is triggered ---
+# --- Triggers ---
+# Defines when the workflow will run.
 on:
-  # 1. Allows you to run this workflow manually from the Actions tab
+  # Allows you to manually trigger this workflow from the GitHub UI.
   workflow_dispatch:
 
-  # 2. Runs the workflow on a schedule
+  # Runs the workflow on a schedule.
+  # The cron string '0 */6 * * *' means "at minute 0 past every 6th hour".
+  # This will run the scraper 4 times a day (at 00:00, 06:00, 12:00, 18:00 UTC).
   schedule:
-    # This is a CRON schedule. This example runs at 23:00 UTC every day.
-    # (That's 6:00 AM WIB in Indonesia).
-    # Use a crontab generator like https://crontab.guru/ to create your own schedule.
-    - cron: '0 17 * * *'
+    - cron: '0 */6 * * *'
 
-# --- The actual job(s) to run ---
+# --- Jobs ---
+# A workflow run is made up of one or more jobs, which run in parallel by default.
 jobs:
-  scrape_data:
-    # The type of virtual machine to run the job on. 'ubuntu-latest' is perfect.
+  # The single job in this workflow, named 'scrape'.
+  scrape:
+    # The type of virtual machine to run the job on. 'ubuntu-latest' is the standard choice.
     runs-on: ubuntu-latest
-    environment: Dorothy
 
-    # The sequence of steps to perform
+    # A sequence of tasks called 'steps' that will be executed as part of the job.
     steps:
       # Step 1: Check out your repository code
-      # This downloads your scraper.py and requirements.txt to the runner
-      - name: Check out repository
+      # This action checks-out your repository under $GITHUB_WORKSPACE, so your job can access it.
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Python
-      # This installs a specific version of Python on the runner
-      - name: Set up Python
+      # Step 2: Set up the Python environment
+      # This action installs a specific version of Python and adds it to the PATH.
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # You can use 3.9, 3.10, etc.
+          python-version: '3.12'
 
-      # Step 3: Install Python dependencies
-      # Reads your requirements.txt and installs the packages
-      - name: Install dependencies
+      # Step 3: Cache Pip dependencies
+      # This speeds up the build by restoring downloaded packages from a previous run.
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          # The path to the directory that should be cached. Pip's cache is here on Linux.
+          path: ~/.cache/pip
+          # An explicit key for restoring and saving the cache.
+          # It uses the requirements.txt hash, so if dependencies change, a new cache is created.
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          # A list of keys to use for restoring the cache if the primary key doesn't match.
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # Step 4: Cache Playwright browser binaries
+      # Playwright browsers are large; caching them saves a lot of time.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          # The path where Playwright stores its browser binaries on Linux.
+          path: ~/.cache/ms-playwright
+          # A unique key for the browser cache.
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      # Step 5: Install dependencies and browser
+      # This step runs command-line programs.
+      - name: Install Dependencies and Browser
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # The '--with-deps' flag installs necessary OS libraries for Firefox to run headlessly.
+          python -m playwright install --with-deps firefox
 
-      # Step 4: Install Playwright's browser
-      # This is the crucial step that was difficult on Termux
-      - name: Install Playwright Browsers
-        run: playwright install firefox --with-deps
-
-      # Step 5: Run the scraper script
-      # It uses the secrets you created as environment variables
-      - name: Run the Python Scraper
+      # Step 6: Run the main scraper script
+      - name: Run Scraper.py
+        # Securely pass secrets from your repository settings to the script as environment variables.
         env:
           NIM: ${{ secrets.NIM }}
           PASSWORD: ${{ secrets.PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python Scraper.py
-
-      # Step 6: Commit the scraped data back to the repository
-      # This step finds any new/changed files (scraped_data/*, scraper_state.json)
-      # and pushes them to your repo .
-      - name: Commit and Push Scraped Files
         run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "github-actions-bot@github.com"
-          git add scraped_data/
-          git add scraper_state.json
-          # Check if there are any changes to commit
-          if git diff --staged --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "📊 Automated Scrape: Update data files"
-            git push
-          fi
+          # Make sure the scraper runs in headless mode in the script itself.
+          python Scraper.py
+
+      # Step 7: Upload scraped data and logs as an artifact
+      # 'if: always()' ensures this step runs even if the 'Run Scraper.py' step fails.
+      # This is crucial for debugging, as it saves the logs and error screenshots.
+      - name: Upload Scraped Data and Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # The name of the artifact to be uploaded.
+          name: scraped-output
+          # A list of files and directories to include in the artifact.
+          # Wildcards can be used. This will grab all .json files, logs, and any error screenshots.
+          path: |
+            scraped_data/
+            scraper_crash.log
+            critical_error_page.png
+            login_failure_final_page.png
