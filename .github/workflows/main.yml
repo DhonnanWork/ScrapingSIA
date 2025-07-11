@@ -78,7 +78,6 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          # Make sure the scraper runs in headless mode in the script itself.
           python Scraper.py
 
       # Step 7: Upload scraped data and logs as an artifact
