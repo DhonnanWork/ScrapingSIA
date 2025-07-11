@@ -248,7 +248,8 @@ function renderCourseDropdown(course) {
     return dB.localeCompare(dA);
   });
   pertemuanArr.forEach(([pertemuanKey, pertemuan], idx) => {
-    if (!isInLastMonth(pertemuan.date_iso)) return;
+    // REMOVE the isInLastMonth filter so all pertemuan are shown
+    // if (!isInLastMonth(pertemuan.date_iso)) return;
     const row = document.createElement('div');
     row.className = 'pertemuan-row';
     // Title
