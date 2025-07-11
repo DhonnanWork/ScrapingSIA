@@ -1,7 +1,56 @@
 --- Project Snapshot of directory: F:\Apps\Sublime Text (4152)\b\Sem 2\Scraping SIA\0\Project Scraping SIA ---
 
+--- Project Tree ---
+Project Scraping SIA/
+├── .github
+│   └── workflows
+│       ├── main.yml
+│       └── main2.yml
+├── Extension
+│   ├── autonavigate.js
+│   ├── background.js
+│   ├── icon-16.ico
+│   ├── icon-32.ico
+│   ├── icon-48.ico
+│   ├── icon-96.ico
+│   ├── manifest.json
+│   ├── popup.css
+│   ├── popup.html
+│   ├── popup.js
+│   ├── show_more.css
+│   ├── show_more.html
+│   └── show_more.js
+├── scraped_data
+│   ├── 2425191A-Basis Data 1.json
+│   ├── 2425191A-Kewarganegaraan.json
+│   ├── 2425191A-Matematika 2.json
+│   ├── 2425191A-Pemrograman 2.json
+│   ├── 2425191A-Rekayasa Perangkat Lunak.json
+│   ├── 2425191A-Sistem Operasi.json
+│   ├── 2425191A-Struktur Data.json
+│   └── courses_list.json
+├── .env
+├── .gitignore
+├── Extension.crx
+├── Extension.pem
+├── LICENSE
+├── README.md
+├── Scraper.py
+├── app.py
+├── critical_error_page.png
+├── requirements.txt
+├── scraper_crash.log
+├── scraper_state.json
+└── tugass.py
+
+================================================================================
+
 --- File: .\.env ---
 # .env file
+NIM="0920240042"
+PASSWORD="ebTI!%24"
+GEMINI_API_KEY="AIzaSyBD5K2pmHJH8Te1q801ZlWfzTqOtBlRBJE"
+
 ================================================================================
 
 --- File: .\.gitignore ---
@@ -22,7 +71,6 @@ __pycache__/
 *.swp
 captcha.png
 critical_error_page.png
-scraper_state.json
 
 # Browser extension build files
 *.crx
@@ -30,78 +78,14 @@ scraper_state.json
 
 # Render persistent disk placeholder
 scraped_data/
-================================================================================
-
---- File: .\app.py ---
-import os
-import json
-from flask import Flask, jsonify, abort
-from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app)  # Allow your browser extension to call this API
-
-# This is the directory where your scraper saves its data.
-# On Render, this will be the path to your persistent disk.
-# For local testing, it's a 'scraped_data' folder in your project.
-DATA_DIR = os.path.join(os.getcwd(), 'scraped_data')
-
-@app.route('/api/courses', methods=['GET'])
-def get_courses():
-    """
-    Endpoint to get the list of all courses.
-    Reads 'courses_list.json'.
-    """
-    file_path = os.path.join(DATA_DIR, 'courses_list.json')
-    if not os.path.exists(file_path):
-        # If the scraper hasn't run yet, return an empty list.
-        return jsonify([])
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error reading courses_list.json: {e}")
-        # Use abort(500) to send a server error response.
-        abort(500, description="Internal server error while reading course list.")
-
-@app.route('/api/course/<string:course_filename>', methods=['GET'])
-def get_course_detail(course_filename):
-    """
-    Endpoint to get the detailed data for a single course.
-    Example: /api/course/MI2A01-Pemrograman-Berorientasi-Objek.json
-    """
-    # Security: Ensure the filename is safe. This prevents users
-    # from trying to access files outside the data directory (e.g., ../../.env)
-    if '..' in course_filename or course_filename.startswith('/'):
-        abort(400, description="Invalid filename.")
-
-    file_path = os.path.join(DATA_DIR, course_filename)
-    if not os.path.exists(file_path):
-        abort(404, description=f"Course data not found for {course_filename}")
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error reading {course_filename}: {e}")
-        abort(500, description=f"Internal server error while reading course data.")
-
-if __name__ == '__main__':
-    # For local testing:
-    # 1. Run scraper.py first to generate the data.
-    # 2. Run this app.py file.
-    # 3. Access http://127.0.0.1:5000/api/courses in your browser.
-    app.run(debug=True, port=5000)
-================================================================================
-
---- File: .\critical_error_page.png ---
-*** Non-text file (.png extension). Content not displayed. ***
 
 ================================================================================
 
 --- File: .\Extension.crx ---
+*** Non-text file (.crx extension). Content not displayed. ***
 
+
+================================================================================
 
 --- File: .\Extension.pem ---
 -----BEGIN PRIVATE KEY-----
@@ -133,6 +117,7 @@ wYUE1cLxvoDHnKvQR831BsMWwGjCgSK+mox9OfkCgYAZ70qNBq84B0W3LbdnVTMx
 p+9GtUfW+D+4xzZIOn4U/Q==
 -----END PRIVATE KEY-----
 
+
 ================================================================================
 
 --- File: .\LICENSE ---
@@ -158,26 +143,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+
 ================================================================================
 
 --- File: .\README.md ---
 # ScrapingSIA
     A simplified dashboard for the Astra Polytechnic SIA website. Features direct file downloads, assignment tracking, and one-click navigation.
 
-================================================================================
 
---- File: .\render.yaml ---
-*** Non-text file (.yaml extension). Content not displayed. ***
-
-================================================================================
-
---- File: .\requirements.txt ---
-playwright
-google-generativeai
-python-dotenv
-Flask
-Flask-Cors
-gunicorn
 ================================================================================
 
 --- File: .\Scraper.py ---
@@ -338,7 +311,7 @@ def run_scraper():
         print(f"Created data directory: {base_data_dir}")
 
         # Add browser context for download handling
-        browser = p.firefox.launch(headless=True)
+        browser = p.firefox.launch(headless=False)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
             accept_downloads=True  # Enable downloads to handle them properly
@@ -396,41 +369,71 @@ def run_scraper():
                         break
                     else:
                         error_message_locator = page.locator("#MainContent_lblMessage[style*='color:Red']")
-                        if error_message_locator.is_visible(timeout=1000):
+                        try:
+                            error_message_locator.wait_for(state="visible", timeout=1000)
+                            is_visible = True
+                        except PlaywrightTimeoutError:
+                            is_visible = False
+                        if is_visible:
                             error_text = error_message_locator.text_content(timeout=1000)
                             if error_text:
                                 error_text = error_text.lower()
                             print(f"Login error: {error_text}")
-                        elif page.locator("#txtCaptcha").is_visible(timeout=1000):
-                             print("CAPTCHA verification failed.")
                         else:
-                            print(f"Login status unclear. URL: {page.url}")
+                            try:
+                                page.locator("#txtCaptcha").wait_for(state="visible", timeout=1000)
+                                is_captcha_visible = True
+                            except PlaywrightTimeoutError:
+                                is_captcha_visible = False
+                            if is_captcha_visible:
+                                print("CAPTCHA verification failed.")
+                            else:
+                                print(f"Login status unclear. URL: {page.url}")
 
                 except PlaywrightTimeoutError:
                     print("Timeout waiting for URL change.")
                     error_message_locator = page.locator("#MainContent_lblMessage[style*='color:Red']")
-                    if error_message_locator.is_visible(timeout=1000):
+                    try:
+                        error_message_locator.wait_for(state="visible", timeout=1000)
+                        is_visible = True
+                    except PlaywrightTimeoutError:
+                        is_visible = False
+                    if is_visible:
                         error_text = error_message_locator.text_content(timeout=1000)
                         if error_text:
                             error_text = error_text.lower()
                         print(f"Login error: {error_text}")
-                    elif page.locator("#txtCaptcha").is_visible(timeout=1000):
-                         print("CAPTCHA verification failed.")
                     else:
-                        print(f"Login status unclear after timeout. URL: {page.url}")
-                        if (page.url.startswith(SIA_BASE_URL) and "default.aspx" in page.url.lower()) or \
-                           (page.url.startswith(SSO_BASE_URL) and "default.aspx" in page.url.lower()):
-                            login_success = True
-                            break
+                        try:
+                            page.locator("#txtCaptcha").wait_for(state="visible", timeout=1000)
+                            is_captcha_visible = True
+                        except PlaywrightTimeoutError:
+                            is_captcha_visible = False
+                        if is_captcha_visible:
+                            print("CAPTCHA verification failed.")
+                        else:
+                            print(f"Login status unclear after timeout. URL: {page.url}")
+                            if (page.url.startswith(SIA_BASE_URL) and "default.aspx" in page.url.lower()) or \
+                               (page.url.startswith(SSO_BASE_URL) and "default.aspx" in page.url.lower()):
+                                login_success = True
+                                break
 
                 if attempt < MAX_CAPTCHA_ATTEMPTS - 1 and not login_success:
                     print("Retrying login...")
-                    if page.url.startswith(LOGIN_URL) and page.locator("#txtCaptcha").is_visible(timeout=1000):
+                    try:
+                        page.locator("#txtCaptcha").wait_for(state="visible", timeout=1000)
+                        is_captcha_visible = True
+                    except PlaywrightTimeoutError:
+                        is_captcha_visible = False
+                    if page.url.startswith(LOGIN_URL) and is_captcha_visible:
                         try:
                             refresh_button = page.locator("#MainContent_btnRefreshCaptcha")
-                            if refresh_button.is_visible(timeout=1000):
+                            try:
+                                refresh_button.wait_for(state="visible", timeout=1000)
                                 refresh_button.click()
                                 time.sleep(1)
+                            except PlaywrightTimeoutError:
+                                pass
                         except Exception:
                             pass
                     elif not page.url.startswith(LOGIN_URL):
@@ -473,7 +476,12 @@ def run_scraper():
             pelaksanaan_perkuliahan_header = page.locator("a:has-text('Pelaksanaan Perkuliahan')")
             aktivitas_pembelajaran_link = page.locator("a:has-text('– Aktivitas Pembelajaran')")
 
-            if not aktivitas_pembelajaran_link.is_visible(timeout=5000):
+            try:
+                aktivitas_pembelajaran_link.wait_for(state="visible", timeout=5000)
+                is_aktivitas_visible = True
+            except PlaywrightTimeoutError:
+                is_aktivitas_visible = False
+            if not is_aktivitas_visible:
                 print("Expanding section...")
                 pelaksanaan_perkuliahan_header.click()
                 page.wait_for_timeout(1000)
@@ -718,7 +726,7 @@ def run_scraper():
                                                 except Exception as e:
                                                     print(f"          Error scraping tugas card: {e}")
                                             kembali_btn = page.locator("#MainContent_btnCancelTugas")
-                                            if kembali_btn.is_visible(timeout=5000):
+                                            if kembali_btn.is_visible():
                                                 print("        Returning to pertemuan list by pressing 'Kembali'...")
                                                 with page.expect_navigation(wait_until="networkidle", timeout=30000):
                                                     kembali_btn.click()
@@ -756,7 +764,7 @@ def run_scraper():
 
                 # Navigate back
                 back_button = page.locator("#MainContent_btnCancelDetail")
-                if back_button.is_visible(timeout=5000):
+                if back_button.is_visible():
                     print("  Returning to courses list...")
                     with page.expect_navigation(wait_until="networkidle", timeout=30000):
                         back_button.click()
@@ -838,6 +846,87 @@ if __name__ == "__main__":
                     log_file.write(f"{'='*50}\n\n")
                 print("Error details saved to scraper_crash.log")
                 exit(1)
+
+================================================================================
+
+--- File: .\app.py ---
+import os
+import json
+from flask import Flask, jsonify, abort
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)  # Allow your browser extension to call this API
+
+# This is the directory where your scraper saves its data.
+# On Render, this will be the path to your persistent disk.
+# For local testing, it's a 'scraped_data' folder in your project.
+DATA_DIR = os.path.join(os.getcwd(), 'scraped_data')
+
+@app.route('/api/courses', methods=['GET'])
+def get_courses():
+    """
+    Endpoint to get the list of all courses.
+    Reads 'courses_list.json'.
+    """
+    file_path = os.path.join(DATA_DIR, 'courses_list.json')
+    if not os.path.exists(file_path):
+        # If the scraper hasn't run yet, return an empty list.
+        return jsonify([])
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error reading courses_list.json: {e}")
+        # Use abort(500) to send a server error response.
+        abort(500, description="Internal server error while reading course list.")
+
+@app.route('/api/course/<string:course_filename>', methods=['GET'])
+def get_course_detail(course_filename):
+    """
+    Endpoint to get the detailed data for a single course.
+    Example: /api/course/MI2A01-Pemrograman-Berorientasi-Objek.json
+    """
+    # Security: Ensure the filename is safe. This prevents users
+    # from trying to access files outside the data directory (e.g., ../../.env)
+    if '..' in course_filename or course_filename.startswith('/'):
+        abort(400, description="Invalid filename.")
+
+    file_path = os.path.join(DATA_DIR, course_filename)
+    if not os.path.exists(file_path):
+        abort(404, description=f"Course data not found for {course_filename}")
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error reading {course_filename}: {e}")
+        abort(500, description=f"Internal server error while reading course data.")
+
+if __name__ == '__main__':
+    # For local testing:
+    # 1. Run scraper.py first to generate the data.
+    # 2. Run this app.py file.
+    # 3. Access http://127.0.0.1:5000/api/courses in your browser.
+    app.run(debug=True, port=5000)
+
+================================================================================
+
+--- File: .\critical_error_page.png ---
+*** Non-text file (.png extension). Content not displayed. ***
+
+
+================================================================================
+
+--- File: .\requirements.txt ---
+playwright
+google-generativeai
+python-dotenv
+Flask
+Flask-Cors
+gunicorn
+
 ================================================================================
 
 --- File: .\scraper_crash.log ---
@@ -888,11 +977,196 @@ Call log:
 
 ==================================================
 
+==================================================
+Scraper crash at 2025-07-08 16:01:35.000479:
+Attempts: 2
+Error: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("#MainContent_gridData_linkDetail_6")
+    - locator resolved to <a title="" rel="tooltip" data-placement="bottom" id="MainContent_gridData_linkDetail_6" data-original-title="Lihat Aktivitas Pembelajaran" href="javascript:__doPostBack('ctl00$MainContent$gridData$ctl08$linkDetail','')">…</a>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - performing click action
+
+Traceback:
+Traceback (most recent call last):
+  File "F:\Apps\Sublime Text (4152)\b\Sem 2\Scraping SIA\0\Project Scraping SIA\Scraper.py", line 633, in <module>
+    run_scraper()
+    ~~~~~~~~~~~^^
+  File "F:\Apps\Sublime Text (4152)\b\Sem 2\Scraping SIA\0\Project Scraping SIA\Scraper.py", line 386, in run_scraper
+    current_course_link.click()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\sync_api\_generated.py", line 15512, in click
+    self._sync(
+    ~~~~~~~~~~^
+        self._impl_obj.click(
+        ^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+        )
+        ^
+    )
+    ^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_sync_base.py", line 115, in _sync
+    return task.result()
+           ~~~~~~~~~~~^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_locator.py", line 160, in click
+    return await self._frame.click(self._selector, strict=True, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_frame.py", line 488, in click
+    await self._channel.send("click", locals_to_params(locals()))
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_connection.py", line 61, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_connection.py", line 528, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("#MainContent_gridData_linkDetail_6")
+    - locator resolved to <a title="" rel="tooltip" data-placement="bottom" id="MainContent_gridData_linkDetail_6" data-original-title="Lihat Aktivitas Pembelajaran" href="javascript:__doPostBack('ctl00$MainContent$gridData$ctl08$linkDetail','')">…</a>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - performing click action
+
+==================================================
+
+==================================================
+Scraper crash at 2025-07-08 16:07:22.538617:
+Attempts: 2
+Error: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("a:has-text('Sistem Informasi Akademik')")
+    - locator resolved to <a href="#app0" aria-expanded="true" aria-controls="app0" data-bs-toggle="collapse" data-bs-parent="#accordion" class="collapsed text-decoration-none">Sistem Informasi Akademik</a>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - performing click action
+
+Traceback:
+Traceback (most recent call last):
+  File "F:\Apps\Sublime Text (4152)\b\Sem 2\Scraping SIA\0\Project Scraping SIA\Scraper.py", line 665, in <module>
+    run_scraper()
+    ~~~~~~~~~~~^^
+  File "F:\Apps\Sublime Text (4152)\b\Sem 2\Scraping SIA\0\Project Scraping SIA\Scraper.py", line 305, in run_scraper
+    sia_link.click()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\sync_api\_generated.py", line 15512, in click
+    self._sync(
+    ~~~~~~~~~~^
+        self._impl_obj.click(
+        ^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+        )
+        ^
+    )
+    ^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_sync_base.py", line 115, in _sync
+    return task.result()
+           ~~~~~~~~~~~^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_locator.py", line 160, in click
+    return await self._frame.click(self._selector, strict=True, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_frame.py", line 488, in click
+    await self._channel.send("click", locals_to_params(locals()))
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_connection.py", line 61, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_connection.py", line 528, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("a:has-text('Sistem Informasi Akademik')")
+    - locator resolved to <a href="#app0" aria-expanded="true" aria-controls="app0" data-bs-toggle="collapse" data-bs-parent="#accordion" class="collapsed text-decoration-none">Sistem Informasi Akademik</a>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - performing click action
+
+==================================================
+
+==================================================
+Scraper crash at 2025-07-10 18:36:11.113062:
+Attempts: 2
+Error: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("a:has-text('Sistem Informasi Akademik')")
+    - locator resolved to <a href="#app0" aria-expanded="true" aria-controls="app0" data-bs-toggle="collapse" data-bs-parent="#accordion" class="collapsed text-decoration-none">Sistem Informasi Akademik</a>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - performing click action
+
+Traceback:
+Traceback (most recent call last):
+  File "F:\Apps\Sublime Text (4152)\b\Sem 2\Scraping SIA\0\Project Scraping SIA\Scraper.py", line 668, in <module>
+    run_scraper()
+    ~~~~~~~~~~~^^
+  File "F:\Apps\Sublime Text (4152)\b\Sem 2\Scraping SIA\0\Project Scraping SIA\Scraper.py", line 308, in run_scraper
+    sia_link.click()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\sync_api\_generated.py", line 15512, in click
+    self._sync(
+    ~~~~~~~~~~^
+        self._impl_obj.click(
+        ^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+        )
+        ^
+    )
+    ^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_sync_base.py", line 115, in _sync
+    return task.result()
+           ~~~~~~~~~~~^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_locator.py", line 160, in click
+    return await self._frame.click(self._selector, strict=True, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_frame.py", line 488, in click
+    await self._channel.send("click", locals_to_params(locals()))
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_connection.py", line 61, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "C:\Users\Dhonnano\AppData\Roaming\Python\Python313\site-packages\playwright\_impl\_connection.py", line 528, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("a:has-text('Sistem Informasi Akademik')")
+    - locator resolved to <a href="#app0" aria-expanded="true" aria-controls="app0" data-bs-toggle="collapse" data-bs-parent="#accordion" class="collapsed text-decoration-none">Sistem Informasi Akademik</a>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - performing click action
+
+==================================================
+
+
 
 ================================================================================
 
 --- File: .\scraper_state.json ---
 *** Non-text file (.json extension). Content not displayed. ***
+
 
 ================================================================================
 
@@ -1009,7 +1283,12 @@ def login_to_sia(page):
             return True
         except PlaywrightTimeoutError:
             error_message = page.locator("#MainContent_lblMessage[style*='color:Red']")
-            if error_message.is_visible(timeout=500):
+            try:
+                error_message.wait_for(state="visible", timeout=500)
+                is_visible = True
+            except PlaywrightTimeoutError:
+                is_visible = False
+            if is_visible:
                 print(f"Login error: {error_message.text_content().strip()}")
             else:
                 print("Login failed. Incorrect CAPTCHA or other issue.")
@@ -1170,6 +1449,19 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+================================================================================
+
+--- File: .\.github\workflows\main.yml ---
+*** Non-text file (.yml extension). Content not displayed. ***
+
+
+================================================================================
+
+--- File: .\.github\workflows\main2.yml ---
+*** Non-text file (.yml extension). Content not displayed. ***
+
+
 ================================================================================
 
 --- File: .\Extension\autonavigate.js ---
@@ -1295,17 +1587,41 @@ async function main() {
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(main, 1200);
 }); 
+
 ================================================================================
 
 --- File: .\Extension\background.js ---
 // Dummy background script for Firefox Manifest V2 compatibility. 
+
 ================================================================================
 
 --- File: .\Extension\icon-16.ico ---
+*** Non-text file (.ico extension). Content not displayed. ***
+
+
+================================================================================
+
+--- File: .\Extension\icon-32.ico ---
+*** Non-text file (.ico extension). Content not displayed. ***
+
+
+================================================================================
+
+--- File: .\Extension\icon-48.ico ---
+*** Non-text file (.ico extension). Content not displayed. ***
+
+
+================================================================================
+
+--- File: .\Extension\icon-96.ico ---
+*** Non-text file (.ico extension). Content not displayed. ***
+
+
 ================================================================================
 
 --- File: .\Extension\manifest.json ---
 *** Non-text file (.json extension). Content not displayed. ***
+
 
 ================================================================================
 
@@ -1413,6 +1729,7 @@ button:hover, .dropdown-btn:hover {
   pointer-events: none !important;
   opacity: 0.7;
 } 
+
 ================================================================================
 
 --- File: .\Extension\popup.html ---
@@ -1430,6 +1747,7 @@ button:hover, .dropdown-btn:hover {
   <script src="popup.js"></script>
 </body>
 </html> 
+
 ================================================================================
 
 --- File: .\Extension\popup.js ---
@@ -1791,6 +2109,7 @@ document.getElementById('show-more-btn').onclick = () => {
 };
 
 render(); 
+
 ================================================================================
 
 --- File: .\Extension\show_more.css ---
@@ -1999,6 +2318,7 @@ body.dark-mode #clear-cache-btn {
 body.dark-mode #clear-cache-btn:hover {
   background: #c82333;
 } 
+
 ================================================================================
 
 --- File: .\Extension\show_more.html ---
@@ -2025,6 +2345,7 @@ body.dark-mode #clear-cache-btn:hover {
   <script src="show_more.js"></script>
 </body>
 </html> 
+
 ================================================================================
 
 --- File: .\Extension\show_more.js ---
@@ -2248,8 +2569,8 @@ function renderCourseDropdown(course) {
   content.className = 'dropdown-content';
   // Sort pertemuan by date_iso descending
   const pertemuanArr = Object.entries(course.pertemuan || {}).sort((a, b) => {
-    const dA = a[1].date_iso || '';
-    const dB = b[1].date_iso || '';
+    const dA = (a[1].date_iso || '').toString();
+    const dB = (b[1].date_iso || '').toString();
     return dB.localeCompare(dA);
   });
   pertemuanArr.forEach(([pertemuanKey, pertemuan], idx) => {
@@ -2541,45 +2862,54 @@ function safeCourseName(course) {
 function safeCourseKode(course) {
   return (course && course.course_info && course.course_info.kode) ? course.course_info.kode : '';
 } 
+
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Basis Data 1.json ---
 *** Non-text file (.json extension). Content not displayed. ***
+
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Kewarganegaraan.json ---
 *** Non-text file (.json extension). Content not displayed. ***
 
+
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Matematika 2.json ---
 *** Non-text file (.json extension). Content not displayed. ***
+
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Pemrograman 2.json ---
 *** Non-text file (.json extension). Content not displayed. ***
 
+
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Rekayasa Perangkat Lunak.json ---
 *** Non-text file (.json extension). Content not displayed. ***
+
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Sistem Operasi.json ---
 *** Non-text file (.json extension). Content not displayed. ***
 
+
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Struktur Data.json ---
 *** Non-text file (.json extension). Content not displayed. ***
 
+
 ================================================================================
 
 --- File: .\scraped_data\courses_list.json ---
 *** Non-text file (.json extension). Content not displayed. ***
+
 
 ================================================================================
 

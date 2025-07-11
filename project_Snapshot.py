@@ -12,7 +12,9 @@ ignore_list = [
     '.gradle',
     'build',
     '__pycache__',
-    '.idea'
+    '.idea',
+    '.vs',
+    '.vscode',
 ]
 # List of common non-text file extensions to handle gracefully.
 # You can extend this list with more extensions if needed.
@@ -28,6 +30,7 @@ NON_TEXT_EXTENSIONS = {
     '.psd', '.ai', '.eps', # Design files
     '.mp4', '.mov', '.avi', '.mkv', # Videos
     '.json', '.xml', '.yaml', '.yml', # Data files that might be large or have complex structures
+    '.crx','.ico',
 }
 
 # --- End Configuration ---
@@ -40,38 +43,77 @@ def is_text_file(filepath):
     _, ext = os.path.splitext(filepath)
     return ext.lower() not in NON_TEXT_EXTENSIONS
 
+def generate_tree(start_path, prefix="", ignore_list=None):
+    """
+    Recursively generates a visual directory tree structure.
+    """
+    if ignore_list is None:
+        ignore_list = []
+    
+    # Use a set for faster lookups
+    ignore_set = set(ignore_list)
+    
+    lines = []
+    try:
+        # Get directory contents, filtering out ignored items
+        entries = [e for e in os.listdir(start_path) if e not in ignore_set]
+        entries.sort()
+    except OSError:
+        return [] # Cannot access directory
+
+    # Separate directories and files to list directories first
+    dirs = [e for e in entries if os.path.isdir(os.path.join(start_path, e))]
+    files = [e for e in entries if os.path.isfile(os.path.join(start_path, e))]
+    
+    # Combine them for processing
+    all_entries = dirs + files
+    
+    for i, entry in enumerate(all_entries):
+        is_last = i == (len(all_entries) - 1)
+        connector = "└── " if is_last else "├── "
+        lines.append(f"{prefix}{connector}{entry}\n")
+        
+        if entry in dirs:
+            new_prefix = prefix + ("    " if is_last else "│   ")
+            lines.extend(generate_tree(os.path.join(start_path, entry), new_prefix, ignore_list))
+    
+    return lines
+
 def create_project_snapshot():
     """
-    Walks through the current directory and its subdirectories,
-    reads the content of each file, and writes it to a single output file.
-    Handles non-text files more gracefully.
+    Generates a project snapshot including a directory tree and file contents.
     """
+    start_dir = '.'
+    
     # Open the output file for writing with UTF-8 encoding.
     with open(output_filename, 'w', encoding='utf-8', errors='replace') as outfile:
-        # Get the starting directory path.
-        start_dir = '.'
-        outfile.write(f"--- Project Snapshot of directory: {os.path.abspath(start_dir)} ---\n\n")
+        # --- 1. Write Header and Project Tree ---
+        abs_start_dir = os.path.abspath(start_dir)
+        outfile.write(f"--- Project Snapshot of directory: {abs_start_dir} ---\n\n")
+        
+        print("🌳 Generating project tree...")
+        outfile.write("--- Project Tree ---\n")
+        # Start the tree with the root directory name
+        outfile.write(f"{os.path.basename(abs_start_dir)}/\n")
+        tree_lines = generate_tree(start_dir, ignore_list=ignore_list)
+        outfile.writelines(tree_lines)
+        outfile.write("\n" + "=" * 80 + "\n\n")
+        print("Tree generation complete.")
 
+        # --- 2. Write File Contents ---
+        print("\n📄 Processing files...")
         # os.walk() is perfect for this. It goes through every directory and file.
         for dirpath, dirnames, filenames in os.walk(start_dir, topdown=True):
-
-            # --- Filtering Logic ---
             # We want to skip ignored directories entirely.
             # We must modify dirnames in place to prevent os.walk from entering them.
-            # Example: If dirnames is ['.git', 'core', 'lwjgl3'], and '.git' is in ignore_list,
-            # dirnames becomes ['core', 'lwjgl3'] for the next iteration.
             dirnames[:] = [d for d in dirnames if d not in ignore_list]
 
-            # --- File Processing ---
-            for filename in filenames:
+            for filename in sorted(filenames):
                 # Skip any explicitly ignored files.
                 if filename in ignore_list:
                     continue
 
-                # Get the full path to the file.
                 file_path = os.path.join(dirpath, filename)
-
-                # Write a clear header for each file.
                 header = f"--- File: {file_path} ---\n"
                 print(f"Processing: {file_path}")  # Log progress to the console.
                 outfile.write(header)
@@ -83,17 +125,16 @@ def create_project_snapshot():
                             content = infile.read()
                             outfile.write(content)
                     except Exception as e:
-                        # If reading fails (e.g., permission errors, encoding issues not caught by 'ignore')
+                        # If reading fails (e.g., permission errors)
                         error_message = f"*** Could not read file content. Reason: {e} ***\n"
                         outfile.write(error_message)
                 else:
                     # For non-text files, write a placeholder message.
-                    # You could optionally try to read a small portion or metadata if needed,
-                    # but for a general snapshot, this is safer.
-                    outfile.write(f"*** Non-text file ({os.path.splitext(file_path)[1]} extension). Content not displayed. ***\n")
+                    ext = os.path.splitext(file_path)[1]
+                    outfile.write(f"*** Non-text file ({ext} extension). Content not displayed. ***\n")
 
                 # Add spacing between files for better readability.
-                outfile.write("\n" + "=" * 80 + "\n\n")
+                outfile.write("\n\n" + "=" * 80 + "\n\n")
 
     print(f"\n✅ Success! All code and file summaries have been written to '{output_filename}'")
 

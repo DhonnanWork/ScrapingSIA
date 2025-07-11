@@ -218,8 +218,8 @@ function renderCourseDropdown(course) {
   content.className = 'dropdown-content';
   // Sort pertemuan by date_iso descending
   const pertemuanArr = Object.entries(course.pertemuan || {}).sort((a, b) => {
-    const dA = a[1].date_iso || '';
-    const dB = b[1].date_iso || '';
+    const dA = (a[1].date_iso || '').toString();
+    const dB = (b[1].date_iso || '').toString();
     return dB.localeCompare(dA);
   });
   pertemuanArr.forEach(([pertemuanKey, pertemuan], idx) => {
