@@ -82,7 +82,7 @@ scraped_data/
 ================================================================================
 
 --- File: .\Extension.crx ---
-*** Non-text file (.crx extension). Content not displayed. ***
+*** Binary file (.crx extension). Content not included. ***
 
 
 ================================================================================
@@ -847,6 +847,7 @@ if __name__ == "__main__":
                 print("Error details saved to scraper_crash.log")
                 exit(1)
 
+
 ================================================================================
 
 --- File: .\app.py ---
@@ -914,7 +915,7 @@ if __name__ == '__main__':
 ================================================================================
 
 --- File: .\critical_error_page.png ---
-*** Non-text file (.png extension). Content not displayed. ***
+*** Binary file (.png extension). Content not included. ***
 
 
 ================================================================================
@@ -1165,7 +1166,7 @@ Call log:
 ================================================================================
 
 --- File: .\scraper_state.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
@@ -1453,13 +1454,13 @@ if __name__ == "__main__":
 ================================================================================
 
 --- File: .\.github\workflows\main.yml ---
-*** Non-text file (.yml extension). Content not displayed. ***
+*** Binary file (.yml extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\.github\workflows\main2.yml ---
-*** Non-text file (.yml extension). Content not displayed. ***
+*** Binary file (.yml extension). Content not included. ***
 
 
 ================================================================================
@@ -1596,31 +1597,31 @@ window.addEventListener('DOMContentLoaded', () => {
 ================================================================================
 
 --- File: .\Extension\icon-16.ico ---
-*** Non-text file (.ico extension). Content not displayed. ***
+*** Binary file (.ico extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\Extension\icon-32.ico ---
-*** Non-text file (.ico extension). Content not displayed. ***
+*** Binary file (.ico extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\Extension\icon-48.ico ---
-*** Non-text file (.ico extension). Content not displayed. ***
+*** Binary file (.ico extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\Extension\icon-96.ico ---
-*** Non-text file (.ico extension). Content not displayed. ***
+*** Binary file (.ico extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\Extension\manifest.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
@@ -2866,49 +2867,49 @@ function safeCourseKode(course) {
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Basis Data 1.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Kewarganegaraan.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Matematika 2.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Pemrograman 2.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Rekayasa Perangkat Lunak.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Sistem Operasi.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\scraped_data\2425191A-Struktur Data.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================
 
 --- File: .\scraped_data\courses_list.json ---
-*** Non-text file (.json extension). Content not displayed. ***
+*** Binary file (.json extension). Content not included. ***
 
 
 ================================================================================

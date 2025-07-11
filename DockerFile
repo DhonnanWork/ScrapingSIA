@@ -1,0 +1,22 @@
+# Use an official Playwright-ready Python image
+FROM mcr.microsoft.com/playwright/python:v1.44.0-jammy
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the requirements file into the container
+COPY requirements.txt .
+
+# Install the Python dependencies
+# --no-cache-dir disables the cache to keep the image size smaller
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install browser dependencies required by Playwright
+RUN playwright install --with-deps firefox
+
+# Copy the rest of your project files into the container's working directory
+COPY . .
+
+# This command will be executed when the container starts
+# It runs the scraper script
+CMD ["python", "Scraper.py"]

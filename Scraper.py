@@ -155,7 +155,7 @@ def run_scraper():
         print(f"Created data directory: {base_data_dir}")
 
         # Add browser context for download handling
-        browser = p.firefox.launch(headless=False)
+        browser = p.firefox.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
             accept_downloads=True  # Enable downloads to handle them properly
