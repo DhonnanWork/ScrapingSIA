@@ -1,17 +1,65 @@
-const DEFAULT_API_URL = 'http://127.0.0.1:5000';
-const COURSE_FILES = [
-  "2425191A-Pemrograman 2.json",
-  "2425191A-Sistem Operasi.json",
-  "2425191A-Struktur Data.json",
-  "2425191A-Basis Data 1.json",
-  "2425191A-Rekayasa Perangkat Lunak.json",
-  "2425191A-Kewarganegaraan.json",
-  "2425191A-Matematika 2.json"
-];
+// --- GITHUB ARTIFACT FETCHING LOGIC ---
+
+// Configuration for your repository
+const GITHUB_REPO = 'DhonnanWork/ScrapingSIA';
+const WORKFLOW_FILE_NAME = 'main.yml';
+const ARTIFACT_NAME = 'scraped-output';
+
+function getGithubPAT() {
+  return localStorage.getItem('github_pat') || '';
+}
+
+function setGithubPAT(token) {
+  localStorage.setItem('github_pat', token);
+}
+
+function githubFetch(url, options = {}) {
+  const pat = getGithubPAT();
+  const headers = options.headers || {};
+  if (pat) {
+    headers['Authorization'] = `token ${pat}`;
+  }
+  return fetch(url, { ...options, headers });
+}
+
+/**
+ * Finds the ID of the most recent successful run for a specific workflow.
+ * @returns {Promise<number>} The ID of the workflow run.
+ */
+async function getLatestWorkflowRunId() {
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE_NAME}/runs?status=success&per_page=1`;
+  const response = await githubFetch(url);
+  if (!response.ok) {
+    throw new Error('Could not fetch workflow runs from GitHub API.');
+  }
+  const data = await response.json();
+  if (!data.workflow_runs || data.workflow_runs.length === 0) {
+    throw new Error('No successful workflow runs were found.');
+  }
+  return data.workflow_runs[0].id;
+}
+
+/**
+ * Gets the download URL for a specific artifact from a workflow run.
+ * @param {number} runId The ID of the workflow run.
+ * @returns {Promise<string>} The URL to download the artifact zip.
+ */
+async function getArtifactDownloadUrl(runId) {
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/actions/runs/${runId}/artifacts`;
+  const response = await githubFetch(url);
+  if (!response.ok) {
+    throw new Error(`Could not fetch artifacts for run ID ${runId}.`);
+  }
+  const data = await response.json();
+  const artifact = data.artifacts.find(art => art.name === ARTIFACT_NAME);
+  if (!artifact) {
+    throw new Error(`Artifact named '${ARTIFACT_NAME}' not found in the latest successful run.`);
+  }
+  return artifact.archive_download_url;
+}
 
 // Cache utility functions
 function getCacheExpiryTime(timestamp) {
-  // Get the top of the next hour after the timestamp
   const date = new Date(timestamp);
   date.setHours(date.getHours() + 1, 0, 0, 0);
   return date.getTime();
@@ -27,6 +75,7 @@ function isCacheValid(cachedData) {
 async function getCachedData(key) {
   try {
     const result = await chrome.storage.local.get(key);
+    if (!result) return undefined;
     return result[key];
   } catch (error) {
     console.warn('Failed to retrieve cached data:', error);
@@ -48,8 +97,7 @@ async function setCachedData(key, data) {
 
 async function clearCache() {
   try {
-    const apiUrl = getApiUrl();
-    const cacheKey = `courses_data_${apiUrl}`;
+    const cacheKey = 'github_courses_data';
     await chrome.storage.local.remove(cacheKey);
     console.log('Cache cleared successfully');
   } catch (error) {
@@ -59,19 +107,15 @@ async function clearCache() {
 
 async function getCacheStatus() {
   try {
-    const apiUrl = getApiUrl();
-    const cacheKey = `courses_data_${apiUrl}`;
+    const cacheKey = 'github_courses_data';
     const cachedData = await getCachedData(cacheKey);
-    
     if (!cachedData) {
       return { exists: false, valid: false, message: 'No cached data' };
     }
-    
     const valid = isCacheValid(cachedData);
     const expiryTime = getCacheExpiryTime(cachedData.timestamp);
     const timeUntilExpiry = expiryTime - Date.now();
     const minutesUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60));
-    
     return {
       exists: true,
       valid: valid,
@@ -86,58 +130,39 @@ async function getCacheStatus() {
   }
 }
 
-function getApiUrl() {
-  return localStorage.getItem('sia_api_url') || DEFAULT_API_URL;
-}
-
-function setApiUrl(url) {
-  localStorage.setItem('sia_api_url', url);
-}
-
 async function loadAllCourseData() {
-  const apiUrl = getApiUrl();
-  const cacheKey = `courses_data_${apiUrl}`;
-  
+  const cacheKey = 'github_courses_data';
+  if (!getGithubPAT()) {
+    throw new Error('GitHub Personal Access Token (PAT) is required. Please enter it below.');
+  }
   try {
-    // Step 1: Try to retrieve cached data
-    console.log(`Checking cache for key: ${cacheKey}`);
     const cachedData = await getCachedData(cacheKey);
-    
-    // Step 2: Check if cache exists and is valid
     if (cachedData && isCacheValid(cachedData)) {
-      console.log('✅ Using cached course data');
-      console.log(`Cache timestamp: ${new Date(cachedData.timestamp).toLocaleString()}`);
-      console.log(`Cache expires at: ${new Date(getCacheExpiryTime(cachedData.timestamp)).toLocaleString()}`);
       return cachedData.data;
     }
-    
-    if (cachedData) {
-      console.log('⚠️ Cache exists but is expired');
-      console.log(`Cache timestamp: ${new Date(cachedData.timestamp).toLocaleString()}`);
-      console.log(`Cache expired at: ${new Date(getCacheExpiryTime(cachedData.timestamp)).toLocaleString()}`);
-    } else {
-      console.log('ℹ️ No cached data found');
+    const runId = await getLatestWorkflowRunId();
+    const downloadUrl = await getArtifactDownloadUrl(runId);
+    const artifactResponse = await githubFetch(downloadUrl);
+    if (!artifactResponse.ok) {
+      throw new Error('Failed to download the artifact zip file.');
     }
-    
-    // Step 3: Cache is stale or doesn't exist, fetch fresh data
-    console.log('🔄 Fetching fresh course data from API');
-    const results = await Promise.all(COURSE_FILES.map(f =>
-      fetch(`${apiUrl}/api/course/${encodeURIComponent(f)}`)
-        .then(r => {
-          if (!r.ok) throw new Error('API error');
-          return r.json();
-        })
-    ));
-    
-    // Step 4: Cache the fresh data
-    console.log('💾 Caching fresh data');
-    await setCachedData(cacheKey, results);
-    console.log('✅ Data cached successfully');
-    
-    return results;
-  } catch (e) {
-    console.error('❌ Error in loadAllCourseData:', e);
-    throw new Error('Failed to connect to SIA Flask API. Please make sure the server is running.');
+    const zipBlob = await artifactResponse.blob();
+    const zip = await JSZip.loadAsync(zipBlob);
+    const courseDataPromises = [];
+    zip.forEach((relativePath, file) => {
+      if (file.name.endsWith('.json') && file.name.includes('scraped_data/')) {
+        const jsonPromise = file.async('string').then(content => JSON.parse(content));
+        courseDataPromises.push(jsonPromise);
+      }
+    });
+    if (courseDataPromises.length === 0) {
+      throw new Error('No .json files found inside the artifact.');
+    }
+    const courses = await Promise.all(courseDataPromises);
+    await setCachedData(cacheKey, courses);
+    return courses;
+  } catch (error) {
+    throw new Error('Failed to get data from GitHub. ' + error.message);
   }
 }
 
@@ -213,7 +238,7 @@ function renderCourseDropdown(course) {
   container.className = 'dropdown';
   const btn = document.createElement('button');
   btn.className = 'dropdown-btn gray';
-  btn.innerHTML = `<span class="dropdown-arrow">&#9660;</span> ${safeCourseKode(course)} - ${safeCourseName(course)}`;
+  btn.innerHTML = `<span class="dropdown-arrow">▼</span> ${safeCourseKode(course)} - ${safeCourseName(course)}`;
   const content = document.createElement('div');
   content.className = 'dropdown-content';
   // Sort pertemuan by date_iso descending
@@ -266,7 +291,7 @@ function renderCourseDropdown(course) {
   container.appendChild(content);
   let expanded = false;
   function updateArrow() {
-    btn.querySelector('.dropdown-arrow').innerHTML = expanded ? '&#9650;' : '&#9660;';
+    btn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
   }
   btn.onclick = () => {
     expanded = !expanded;
@@ -302,7 +327,7 @@ function renderPengumpulanDropdown(allCourses) {
   container.className = 'dropdown';
   const btn = document.createElement('button');
   btn.className = 'dropdown-btn gray';
-  btn.innerHTML = `<span class="dropdown-arrow">&#9660;</span> Pengumpulan Tugas Aktif`;
+  btn.innerHTML = `<span class="dropdown-arrow">▼</span> Pengumpulan Tugas Aktif`;
   const content = document.createElement('div');
   content.className = 'dropdown-content';
   allPengumpulan.forEach((t, idx) => {
@@ -324,7 +349,7 @@ function renderPengumpulanDropdown(allCourses) {
   container.appendChild(content);
   let expanded = true;
   function updateArrow() {
-    btn.querySelector('.dropdown-arrow').innerHTML = expanded ? '&#9650;' : '&#9660;';
+    btn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
   }
   btn.onclick = () => {
     expanded = !expanded;
@@ -345,18 +370,26 @@ function isFuture(isoDate) {
 
 function render() {
   const root = document.getElementById('show-more-root');
-  root.innerHTML = 'Loading...';
+  root.innerHTML = '';
+  root.appendChild(renderPATInput());
+  if (!getGithubPAT()) {
+    root.appendChild(renderPATWarning());
+    return;
+  }
+  root.innerHTML += '<div style="margin-bottom:8px;"></div>';
+  root.appendChild(document.createElement('hr'));
+  root.innerHTML += '<div style="margin-bottom:8px;"></div>';
+  root.appendChild(document.createElement('div'));
+  // File-File Pelajaran Dropdown
+  const fileDropdown = document.createElement('div');
+  fileDropdown.className = 'dropdown';
+  const fileBtn = document.createElement('button');
+  fileBtn.className = 'dropdown-btn gray';
+  fileBtn.innerHTML = `<span class="dropdown-arrow">▼</span> File - File Pelajaran`;
+  const fileContent = document.createElement('div');
+  fileContent.className = 'dropdown-content show';
   loadAllCourseData().then(courses => {
     try {
-      root.innerHTML = '';
-      // File-File Pelajaran Dropdown
-      const fileDropdown = document.createElement('div');
-      fileDropdown.className = 'dropdown';
-      const fileBtn = document.createElement('button');
-      fileBtn.className = 'dropdown-btn gray';
-      fileBtn.innerHTML = `<span class="dropdown-arrow">&#9660;</span> File - File Pelajaran`;
-      const fileContent = document.createElement('div');
-      fileContent.className = 'dropdown-content show';
       courses.forEach(course => {
         if (!course || !course.course_info) return; // skip if data is missing
         fileContent.appendChild(renderCourseDropdown(course));
@@ -368,7 +401,7 @@ function render() {
       fileDropdown.appendChild(fileContent);
       let expanded = true;
       function updateArrow() {
-        fileBtn.querySelector('.dropdown-arrow').innerHTML = expanded ? '&#9650;' : '&#9660;';
+        fileBtn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
       }
       fileBtn.onclick = () => {
         expanded = !expanded;
@@ -388,28 +421,6 @@ function render() {
   }).catch(err => {
     root.innerHTML = `<div class='warning'>${err.message}</div>`;
   });
-}
-
-function renderApiInput() {
-  const container = document.createElement('div');
-  container.className = 'api-url-input';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'API Base URL';
-  input.value = getApiUrl();
-  input.onchange = async (e) => {
-    const oldUrl = getApiUrl();
-    setApiUrl(e.target.value);
-    
-    // Clear cache if API URL changed
-    if (oldUrl !== e.target.value) {
-      await clearCache();
-    }
-    
-    render();
-  };
-  container.appendChild(input);
-  return container;
 }
 
 // Add dark mode toggle
@@ -497,9 +508,14 @@ function setupCacheControls() {
   };
 }
 
+function setupInputSavers() {
+  // Remove NIM, PASSWORD, GEMINI inputs (already removed from HTML)
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   renderDarkModeToggle();
   setupCacheControls();
+  setupInputSavers();
   updateCacheStatus();
   render();
 });
@@ -511,3 +527,90 @@ function safeCourseName(course) {
 function safeCourseKode(course) {
   return (course && course.course_info && course.course_info.kode) ? course.course_info.kode : '';
 } 
+
+// UI for PAT input
+function renderPATInput() {
+  const patContainer = document.createElement('div');
+  patContainer.className = 'pat-input-container';
+  patContainer.style.margin = '16px 0';
+  const label = document.createElement('label');
+  label.textContent = 'GitHub Personal Access Token (PAT):';
+  label.style.display = 'block';
+  label.style.marginBottom = '4px';
+  patContainer.appendChild(label);
+  const patLink = document.createElement('a');
+  patLink.textContent = "Don't know your Github PAT?";
+  patLink.href = 'https://github.com/settings/personal-access-tokens';
+  patLink.target = '_blank';
+  patLink.className = 'blue-link';
+  patLink.style.fontSize = '0.9em';
+  patLink.style.marginBottom = '8px';
+  patLink.style.display = 'block';
+  patContainer.appendChild(patLink);
+  const inputWrapper = document.createElement('div');
+  inputWrapper.style.display = 'flex';
+  inputWrapper.style.alignItems = 'center';
+  const patInput = document.createElement('input');
+  patInput.type = 'password';
+  patInput.id = 'github-pat-input';
+  patInput.style.flex = '1';
+  patInput.style.fontSize = '1em';
+  patInput.style.padding = '4px 8px';
+  patInput.style.marginRight = '8px';
+  patInput.autocomplete = 'off';
+  patInput.value = getGithubPAT();
+  inputWrapper.appendChild(patInput);
+  const eyeBtn = document.createElement('button');
+  eyeBtn.type = 'button';
+  eyeBtn.innerHTML = '👁️';
+  eyeBtn.style.fontSize = '1.2em';
+  eyeBtn.style.background = 'none';
+  eyeBtn.style.border = 'none';
+  eyeBtn.style.cursor = 'pointer';
+  eyeBtn.style.outline = 'none';
+  eyeBtn.onclick = () => {
+    patInput.type = patInput.type === 'password' ? 'text' : 'password';
+    eyeBtn.innerHTML = patInput.type === 'password' ? '👁️' : '🙈';
+  };
+  inputWrapper.appendChild(eyeBtn);
+  patContainer.appendChild(inputWrapper);
+  // Status indicator
+  const statusDiv = document.createElement('div');
+  statusDiv.style.marginTop = '6px';
+  statusDiv.style.height = '22px';
+  patContainer.appendChild(statusDiv);
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save Token';
+  saveBtn.style.marginTop = '8px';
+  saveBtn.onclick = async () => {
+    statusDiv.innerHTML = '<span style="color: #ffc107; font-size: 1.2em;">⏳ Saving...</span>';
+    try {
+      await new Promise(r => setTimeout(r, 600)); // Simulate async save
+      setGithubPAT(patInput.value);
+      patInput.value = getGithubPAT();
+      patInput.type = 'password';
+      eyeBtn.innerHTML = '👁️';
+      statusDiv.innerHTML = '<span style="color: #28a745; font-size: 1.2em;">✔️ Saved!</span>';
+      setTimeout(() => { statusDiv.innerHTML = ''; }, 2000);
+      render();
+    } catch (e) {
+      statusDiv.innerHTML = '<span style="color: #dc3545; font-size: 1.2em;">❌ Failed to save</span>';
+      setTimeout(() => { statusDiv.innerHTML = ''; }, 2000);
+    }
+  };
+  patContainer.appendChild(saveBtn);
+  return patContainer;
+}
+
+function renderPATWarning() {
+  const warn = document.createElement('div');
+  warn.className = 'warning';
+  warn.style.color = '#b00';
+  warn.style.background = '#fff3f3';
+  warn.style.padding = '8px';
+  warn.style.margin = '12px 0';
+  warn.style.border = '1px solid #b00';
+  warn.style.borderRadius = '4px';
+  warn.textContent = 'GitHub Personal Access Token (PAT) is required to fetch data. Please enter it below.';
+  return warn;
+}
