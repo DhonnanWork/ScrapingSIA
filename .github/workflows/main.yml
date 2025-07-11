@@ -8,10 +8,10 @@ on:
   workflow_dispatch:
 
   # Runs the workflow on a schedule.
-  # The cron string '0 */6 * * *' means "at minute 0 past every 6th hour".
-  # This will run the scraper 4 times a day (at 00:00, 06:00, 12:00, 18:00 UTC).
+  # The cron string '0 8 * * *' runs the job at 08:00 UTC every day.
+  # This corresponds to 15:00 WIB (Western Indonesia Time), which is UTC+7.
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 8 * * *'
 
 # --- Jobs ---
 # A workflow run is made up of one or more jobs, which run in parallel by default.
