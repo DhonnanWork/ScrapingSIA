@@ -46,18 +46,26 @@ jobs:
           # The HTTPS clone URL for your Gist
           GIST_URL: "https://gist.github.com/16c307074f0e47ece82b500262347d75.git"
         run: |
+          # Configure git for the commit
           git config --global user.name "SIA Scraper Bot"
           git config --global user.email "actions-bot@github.com"
           
+          # Clone the Gist repository
           git clone $GIST_URL gist_temp
+          
+          # Copy the aggregated file from the scraper's output into the Gist directory
+          # This replaces the entire 'jq' logic
           cp scraped_data/courses_data.json gist_temp/courses_data.json
           
+          # Navigate into the cloned Gist directory
           cd gist_temp
           
+          # Check for changes to avoid empty commits
           if ! git diff --quiet; then
             echo "Data has changed. Committing and pushing to Gist."
             git add courses_data.json
             git commit -m "Update scraped data on $(date)"
+            # Push the changes back to the Gist using the PAT for authentication
             git push https://x-access-token:$GIST_PAT@gist.github.com/16c307074f0e47ece82b500262347d75.git
           else
             echo "No changes in data. Skipping push to Gist."
