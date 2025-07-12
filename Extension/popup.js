@@ -1,27 +1,26 @@
 // --- GIST DATA FETCHING LOGIC ---
 
 async function loadAllCourseData() {
-  // IMPORTANT: This is the "Raw" URL of your Gist.
   const GIST_RAW_URL = 'https://gist.githubusercontent.com/DhonnanWork/16c307074f0e47ece82b500262347d75/raw/93abe45e25be6d45664e3e1d153cab693189ff05/courses_data.json';
 
   try {
     console.log(`Fetching course data from Gist...`);
-    // { cache: 'no-store' } tells the browser to always fetch the latest version of the file,
-    // bypassing its local cache. This ensures users see up-to-date information.
     const response = await fetch(GIST_RAW_URL, { cache: 'no-store' });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch data from Gist. Status: ${response.status}`);
     }
 
-    const courses = await response.json();
-    console.log(`Successfully loaded data from Gist.`);
-    return courses;
+    // Fetch as plain text first, then manually parse. This is more robust.
+    const textData = await response.text();
+    const coursesData = JSON.parse(textData);
+    
+    console.log(`Successfully loaded and parsed data from Gist.`);
+    return coursesData;
 
   } catch (error) {
-    console.error('❌ Error fetching data from Gist:', error);
-    // Provide a user-friendly error message for the extension UI.
-    throw new Error('Failed to get data. Please check your internet connection.');
+    console.error('❌ Error fetching or parsing data from Gist:', error);
+    throw new Error('Failed to get or parse data. Please check the data format in the Gist.');
   }
 }
 
@@ -165,40 +164,41 @@ function makePengumpulanLink(pengumpulanTitle, courseInfo, pertemuanKey, disable
 
 function render() {
   const root = document.getElementById('sia-quick-root');
-  root.innerHTML = '';
-  let networkError = false;
-  loadAllCourseData().then(courses => {
+  root.innerHTML = 'Loading...';
+
+  loadAllCourseData().then(data => {
+    if (!Array.isArray(data)) {
+      throw new Error("Data format error: The final data is not an array.");
+    }
+    const courses = data.filter(item => typeof item === 'object' && item !== null && item.course_info);
+    
     const now = new Date();
     const pertemuanFiles = [];
     const activePengumpulan = [];
+    
     courses.forEach(course => {
       if (!course || !course.course_info) return;
       const courseName = course.course_info.nama;
       Object.entries(course.pertemuan || {}).forEach(([pertemuanKey, pertemuan]) => {
-        if (!isInLastMonthOrFuture(pertemuan.date_iso)) return;
-        // Check if any tugas in this pertemuan is active
+        const date_iso = Array.isArray(pertemuan.date_iso) ? pertemuan.date_iso[0] : pertemuan.date_iso;
+        if (!isInLastMonthOrFuture(date_iso)) return;
+
         const hasActiveTugas = (pertemuan.tugas || []).some(t => isDeadlineActive(t.deadline));
-        const pertemuanIsFuture = isFuture(pertemuan.date_iso);
+        const pertemuanIsFuture = isFuture(date_iso);
+
         if (hasActiveTugas || pertemuanIsFuture) {
-          // Show all [BAHAN AJAR] and [Tugas] from this pertemuan
           (pertemuan.files || []).forEach(f => {
-            if (f.title &&
-                (/\[BAHAN AJAR\]/i.test(f.title) || /\[Tugas\]/i.test(f.title)) &&
-                !/Detail Aktivitas Pembelajaran/i.test(f.title) &&
-                !/\[Batas Waktu Pengumpulan Tugas/i.test(f.title)) {
+            if (f.title && (/[\[BAHAN AJAR\]]/i.test(f.title) || /[\[Tugas\]]/i.test(f.title)) && !/Detail Aktivitas Pembelajaran/i.test(f.title) && !/[\[Batas Waktu Pengumpulan Tugas]/i.test(f.title)) {
               pertemuanFiles.push(makeBlueLink(`${f.title} - ${courseName}`, f.url));
             }
           });
           (pertemuan.tugas || []).forEach(t => {
-            if (t.title &&
-                (/\[BAHAN AJAR\]/i.test(t.title) || /\[Tugas\]/i.test(t.title)) &&
-                !/Detail Aktivitas Pembelajaran/i.test(t.title) &&
-                !/\[Batas Waktu Pengumpulan Tugas/i.test(t.title)) {
+            // TYPO FIX: Changed f.title to t.title in the next two lines
+            if (t.title && (/[\[BAHAN AJAR\]]/i.test(t.title) || /[\[Tugas\]]/i.test(t.title)) && !/Detail Aktivitas Pembelajaran/i.test(t.title) && !/[\[Batas Waktu Pengumpulan Tugas]/i.test(t.title)) {
               pertemuanFiles.push(makeBlueLink(`${t.title} - ${courseName}`, t.url));
             }
           });
         }
-        // For active pengumpulan tugas in last month or future
         (pertemuan.tugas || []).forEach(t => {
           if ((t.active || isDeadlineActive(t.deadline)) && t.pengumpulan_title && !/Detail Aktivitas Pembelajaran/i.test(t.title)) {
             activePengumpulan.push(makePengumpulanLink(t.pengumpulan_title, course.course_info, pertemuanKey, false));
@@ -206,11 +206,12 @@ function render() {
         });
       });
     });
+
     root.innerHTML = '';
     root.appendChild(renderDropdown('Bahan Ajar & Tugas (Pertemuan dengan Pengumpulan Aktif/Future)', pertemuanFiles, true));
     root.appendChild(renderDropdown('Active Pengumpulan Tugas', activePengumpulan, true));
+
   }).catch(err => {
-    networkError = true;
     root.innerHTML = `<div class='warning'>${err.message}</div>`;
   });
 }

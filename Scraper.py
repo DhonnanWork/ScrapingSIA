@@ -616,6 +616,38 @@ def run_scraper():
                     print("  'Kembali' button not found. Re-navigating.")
                     page.goto(COURSES_LIST_PAGE_URL, timeout=60000, wait_until="networkidle")
 
+            # --- START: NEW CODE TO AGGREGATE ALL COURSE DATA ---
+            print("\nAggregating all course data into a single file...")
+            all_courses_data = []
+            for course_info in course_info_list:
+                course_name_full = f"{course_info.get('kode', '')}-{course_info.get('nama', '')}" if course_info else ""
+                if not course_name_full:
+                    continue # Skip if course info was empty
+
+                json_filename = f"{sanitize_filename(course_name_full)}.json"
+                json_filepath = os.path.join(base_data_dir, json_filename)
+
+                if os.path.exists(json_filepath):
+                    try:
+                        with open(json_filepath, 'r', encoding='utf-8') as f:
+                            course_data_content = json.load(f)
+                            all_courses_data.append(course_data_content)
+                            print(f"  Added {json_filename} to aggregation")
+                    except Exception as e:
+                        print(f"  Error reading {json_filename}: {e}")
+                else:
+                    print(f"  Warning: Expected file {json_filename} not found. Skipping.")
+
+            # Save the final aggregated data
+            final_json_path = os.path.join(base_data_dir, "courses_data.json")
+            try:
+                with open(final_json_path, 'w', encoding='utf-8') as f:
+                    json.dump(all_courses_data, f, ensure_ascii=False, indent=4)
+                print(f"Successfully aggregated {len(all_courses_data)} courses into: {final_json_path}")
+            except Exception as e:
+                print(f"  ERROR saving final aggregated JSON: {e}")
+            # --- END: NEW CODE TO AGGREGATE ALL COURSE DATA ---
+
             print("\nFinished processing all courses!")
 
         except Exception as e:
