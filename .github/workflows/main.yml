@@ -1,98 +1,83 @@
 # A friendly name for the workflow, which will be displayed in the GitHub Actions tab.
-name: Run SIA Scraper
+name: Run SIA Scraper and Update Gist
 
-# --- Triggers ---
-# Defines when the workflow will run.
 on:
-  # Allows you to manually trigger this workflow from the GitHub UI.
   workflow_dispatch:
-
-  # Runs the workflow on a schedule.
-  # The cron string '0 8 * * *' runs the job at 08:00 UTC every day.
-  # This corresponds to 15:00 WIB (Western Indonesia Time), which is UTC+7.
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '0 8 * * *' # Runs at 15:00 WIB (08:00 UTC)
 
-# --- Jobs ---
-# A workflow run is made up of one or more jobs, which run in parallel by default.
 jobs:
-  # The single job in this workflow, named 'scrape'.
-  scrape:
-    # The type of virtual machine to run the job on. 'ubuntu-latest' is the standard choice.
+  scrape-and-update:
     runs-on: ubuntu-latest
-
-    # A sequence of tasks called 'steps' that will be executed as part of the job.
     steps:
-      # Step 1: Check out your repository code
-      # This action checks-out your repository under $GITHUB_WORKSPACE, so your job can access it.
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up the Python environment
-      # This action installs a specific version of Python and adds it to the PATH.
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # Step 3: Cache Pip dependencies
-      # This speeds up the build by restoring downloaded packages from a previous run.
       - name: Cache pip
         uses: actions/cache@v4
         with:
-          # The path to the directory that should be cached. Pip's cache is here on Linux.
           path: ~/.cache/pip
-          # An explicit key for restoring and saving the cache.
-          # It uses the requirements.txt hash, so if dependencies change, a new cache is created.
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          # A list of keys to use for restoring the cache if the primary key doesn't match.
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Step 4: Cache Playwright browser binaries
-      # Playwright browsers are large; caching them saves a lot of time.
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
-          # The path where Playwright stores its browser binaries on Linux.
           path: ~/.cache/ms-playwright
-          # A unique key for the browser cache.
           key: ${{ runner.os }}-playwright-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      # Step 5: Install dependencies and browser
-      # This step runs command-line programs.
       - name: Install Dependencies and Browser
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # The '--with-deps' flag installs necessary OS libraries for Firefox to run headlessly.
           python -m playwright install --with-deps firefox
 
-      # Step 6: Run the main scraper script
       - name: Run Scraper.py
-        # Securely pass secrets from your repository settings to the script as environment variables.
         env:
           NIM: ${{ secrets.NIM }}
           PASSWORD: ${{ secrets.PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          python Scraper.py
+        run: python Scraper.py
 
-      # Step 7: Upload scraped data and logs as an artifact
-      # 'if: always()' ensures this step runs even if the 'Run Scraper.py' step fails.
-      # This is crucial for debugging, as it saves the logs and error screenshots.
-      - name: Upload Scraped Data and Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          # The name of the artifact to be uploaded.
-          name: scraped-output
-          # A list of files and directories to include in the artifact.
-          # Wildcards can be used. This will grab all .json files, logs, and any error screenshots.
-          path: |
-            scraped_data/
-            scraper_crash.log
-            critical_error_page.png
-            login_failure_final_page.png
+      # NEW FINAL STEP: This replaces the 'upload-artifact' step.
+      - name: Update Gist with Scraped Data
+        env:
+          # This uses the GIST_PAT secret you created in the repository settings.
+          GIST_PAT: ${{ secrets.GIST_PAT }}
+          # IMPORTANT: This is the HTTPS clone URL of your Gist.
+          GIST_URL: "https://gist.github.com/16c307074f0e47ece82b500262347d75.git"
+        run: |
+          # Configure git with a dummy user name and email for the commit.
+          git config --global user.name "SIA Scraper Bot"
+          git config --global user.email "bot@example.com"
+          
+          # Clone the Gist repository into a temporary directory.
+          git clone $GIST_URL gist_temp
+          
+          # Install 'jq', a tool for processing JSON.
+          # We use it here to merge all individual .json files from the scraped_data directory
+          # into a single, valid JSON array file named 'courses_data.json'.
+          sudo apt-get update && sudo apt-get install -y jq
+          jq -s '.' scraped_data/*.json > gist_temp/courses_data.json
+          
+          # Navigate into the cloned Gist directory.
+          cd gist_temp
+          
+          # Check if the data file has actually changed to avoid creating empty commits.
+          if ! git diff --quiet; then
+            echo "Data has changed. Committing and pushing to Gist."
+            git add courses_data.json
+            git commit -m "Update scraped data"
+            # Push the changes back to the Gist using the PAT for authentication.
+            git push https://x-access-token:$GIST_PAT@gist.github.com/16c307074f0e47ece82b500262347d75.git
+          else
+            echo "No changes in data. Skipping push to Gist."
+          fi
