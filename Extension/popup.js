@@ -1,7 +1,7 @@
 // --- GIST DATA FETCHING LOGIC ---
 
 async function loadAllCourseData() {
-  const GIST_RAW_URL = 'https://gist.githubusercontent.com/DhonnanWork/16c307074f0e47ece82b500262347d75/raw/93abe45e25be6d45664e3e1d153cab693189ff05/courses_data.json';
+  const GIST_RAW_URL = 'https://gist.githubusercontent.com/DhonnanWork/16c307074f0e47ece82b500262347d75/raw/77a275a98279a415652a5b89e481929d0ff7102f/courses_data.json';
 
   try {
     console.log(`Fetching course data from Gist...`);
