@@ -1,27 +1,26 @@
 // --- GIST DATA FETCHING LOGIC ---
 
 async function loadAllCourseData() {
-  // IMPORTANT: This is the "Raw" URL of your Gist.
   const GIST_RAW_URL = 'https://gist.githubusercontent.com/DhonnanWork/16c307074f0e47ece82b500262347d75/raw/93abe45e25be6d45664e3e1d153cab693189ff05/courses_data.json';
 
   try {
     console.log(`Fetching course data from Gist...`);
-    // { cache: 'no-store' } tells the browser to always fetch the latest version of the file,
-    // bypassing its local cache. This ensures users see up-to-date information.
     const response = await fetch(GIST_RAW_URL, { cache: 'no-store' });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch data from Gist. Status: ${response.status}`);
     }
 
-    const courses = await response.json();
-    console.log(`Successfully loaded data from Gist.`);
-    return courses;
+    // Fetch as plain text first, then manually parse. This is more robust.
+    const textData = await response.text();
+    const coursesData = JSON.parse(textData);
+    
+    console.log(`Successfully loaded and parsed data from Gist.`);
+    return coursesData;
 
   } catch (error) {
-    console.error('❌ Error fetching data from Gist:', error);
-    // Provide a user-friendly error message for the extension UI.
-    throw new Error('Failed to get data. Please check your internet connection.');
+    console.error('❌ Error fetching or parsing data from Gist:', error);
+    throw new Error('Failed to get or parse data. Please check the data format in the Gist.');
   }
 }
 
@@ -102,8 +101,8 @@ function renderCourseDropdown(course) {
   content.className = 'dropdown-content';
   // Sort pertemuan by date_iso descending
   const pertemuanArr = Object.entries(course.pertemuan || {}).sort((a, b) => {
-    const dA = (a[1].date_iso || '').toString();
-    const dB = (b[1].date_iso || '').toString();
+    const dA = (Array.isArray(a[1].date_iso) ? a[1].date_iso[0] : a[1].date_iso || '').toString();
+    const dB = (Array.isArray(b[1].date_iso) ? b[1].date_iso[0] : b[1].date_iso || '').toString();
     return dB.localeCompare(dA);
   });
   pertemuanArr.forEach(([pertemuanKey, pertemuan], idx) => {
@@ -168,13 +167,14 @@ function renderPengumpulanDropdown(allCourses) {
   allCourses.forEach(course => {
     if (!course || !course.course_info) return;
     Object.entries(course.pertemuan || {}).forEach(([pertemuanKey, pertemuan]) => {
-      if (!isInLastMonth(pertemuan.date_iso) && !isFuture(pertemuan.date_iso)) return;
+      const date_iso = Array.isArray(pertemuan.date_iso) ? pertemuan.date_iso[0] : pertemuan.date_iso;
+      if (!isInLastMonth(date_iso) && !isFuture(date_iso)) return;
       (pertemuan.tugas || []).forEach(t => {
         if ((t.active || isDeadlineActive(t.deadline)) && t.pengumpulan_title && !/Detail Aktivitas Pembelajaran/i.test(t.title)) {
           allPengumpulan.push({
             ...t,
             pertemuanKey,
-            date_iso: pertemuan.date_iso || '',
+            date_iso: date_iso || '',
             courseName: safeCourseName(course),
             courseInfo: course.course_info // pass the correct course info
           });
@@ -230,47 +230,54 @@ function isFuture(isoDate) {
 
 function render() {
   const root = document.getElementById('show-more-root');
-  root.innerHTML = '';
-  root.innerHTML += '<div style="margin-bottom:8px;"></div>';
-  root.appendChild(document.createElement('hr'));
-  root.innerHTML += '<div style="margin-bottom:8px;"></div>';
-  root.appendChild(document.createElement('div'));
-  // File-File Pelajaran Dropdown
-  const fileDropdown = document.createElement('div');
-  fileDropdown.className = 'dropdown';
-  const fileBtn = document.createElement('button');
-  fileBtn.className = 'dropdown-btn gray';
-  fileBtn.innerHTML = `<span class="dropdown-arrow">▼</span> File - File Pelajaran`;
-  const fileContent = document.createElement('div');
-  fileContent.className = 'dropdown-content show';
-  loadAllCourseData().then(courses => {
-    try {
-      courses.forEach(course => {
-        if (!course || !course.course_info) return; // skip if data is missing
-        fileContent.appendChild(renderCourseDropdown(course));
-        const hr = document.createElement('div');
-        hr.className = 'row-separator';
-        fileContent.appendChild(hr);
-      });
-      fileDropdown.appendChild(fileBtn);
-      fileDropdown.appendChild(fileContent);
-      let expanded = true;
-      function updateArrow() {
-        fileBtn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
-      }
-      fileBtn.onclick = () => {
-        expanded = !expanded;
-        fileContent.classList.toggle('show', expanded);
-        updateArrow();
-      };
-      updateArrow();
-      root.appendChild(fileDropdown);
-      // Pengumpulan Tugas Dropdown
-      root.appendChild(renderPengumpulanDropdown(courses));
-    } catch (err) {
-      root.innerHTML = `<div class='warning'>An error occurred while rendering: ${err && err.message ? err.message : err}</div>`;
+  root.innerHTML = 'Loading...'; // Display a loading message initially
+
+  loadAllCourseData().then(data => {
+    // FIX: Add final validation and filtering logic
+    if (!Array.isArray(data)) {
+      throw new Error("Data format error: The final data is not an array.");
     }
+    const courses = data.filter(item => typeof item === 'object' && item !== null && item.course_info);
+
+    // Clear the loading message and prepare for rendering
+    root.innerHTML = '';
+
+    // Create a container for all course dropdowns
+    const fileDropdown = document.createElement('div');
+    fileDropdown.className = 'dropdown';
+    const fileBtn = document.createElement('button');
+    fileBtn.className = 'dropdown-btn gray';
+    fileBtn.innerHTML = `<span class="dropdown-arrow">▼</span> File - File Pelajaran`;
+    const fileContent = document.createElement('div');
+    fileContent.className = 'dropdown-content show'; // Show by default
+
+    // Populate the container
+    courses.forEach(course => {
+      if (!course || !course.course_info) return; // Skip if data is malformed
+      fileContent.appendChild(renderCourseDropdown(course));
+    });
+
+    fileDropdown.appendChild(fileBtn);
+    fileDropdown.appendChild(fileContent);
+
+    // Event listener for the main dropdown toggle
+    let expanded = true;
+    function updateArrow() {
+      fileBtn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
+    }
+    fileBtn.onclick = () => {
+      expanded = !expanded;
+      fileContent.classList.toggle('show', expanded);
+      updateArrow();
+    };
+    updateArrow(); // Set initial arrow state
+
+    // Append the fully constructed elements to the DOM
+    root.appendChild(fileDropdown);
+    root.appendChild(renderPengumpulanDropdown(courses));
+
   }).catch(err => {
+    // Display error message if the promise fails
     root.innerHTML = `<div class='warning'>${err.message}</div>`;
   });
 }
