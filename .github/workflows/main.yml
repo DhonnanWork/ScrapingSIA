@@ -1,3 +1,14 @@
+# A friendly name for the workflow
+name: Run SIA Scraper and Update Gist
+
+# Defines the triggers for the workflow
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  # Runs on a schedule (at 08:00 UTC every day)
+  schedule:
+    - cron: '0 8 * * *'
+
 jobs:
   scrape-and-update:
     runs-on: ubuntu-latest
@@ -39,11 +50,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python Scraper.py
 
-      # MODIFIED FINAL STEP: This version is simpler and uses the file created by Scraper.py
       - name: Update Gist with Scraped Data
         env:
           GIST_PAT: ${{ secrets.GIST_PAT }}
-          # The HTTPS clone URL for your Gist
           GIST_URL: "https://gist.github.com/16c307074f0e47ece82b500262347d75.git"
         run: |
           # Configure git for the commit
@@ -53,8 +62,7 @@ jobs:
           # Clone the Gist repository
           git clone $GIST_URL gist_temp
           
-          # Copy the aggregated file from the scraper's output into the Gist directory
-          # This replaces the entire 'jq' logic
+          # Copy the final aggregated file from the scraper's output
           cp scraped_data/courses_data.json gist_temp/courses_data.json
           
           # Navigate into the cloned Gist directory
@@ -65,7 +73,7 @@ jobs:
             echo "Data has changed. Committing and pushing to Gist."
             git add courses_data.json
             git commit -m "Update scraped data on $(date)"
-            # Push the changes back to the Gist using the PAT for authentication
+            # Push the changes back to the Gist
             git push https://x-access-token:$GIST_PAT@gist.github.com/16c307074f0e47ece82b500262347d75.git
           else
             echo "No changes in data. Skipping push to Gist."
