@@ -1,9 +1,10 @@
 function getNavTarget() {
-  try {
-    return JSON.parse(localStorage.getItem('sia_nav_target') || '{}');
-  } catch {
-    return {};
-  }
+  // SECURITY FIX: Use chrome.storage.local instead of localStorage
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['sia_nav_target'], (result) => {
+      resolve(result.sia_nav_target || {});
+    });
+  });
 }
 
 function normalize(str) {
@@ -24,16 +25,22 @@ function waitFor(selector, timeout = 10000) {
 }
 
 async function stepLogin(nav) {
-  if (document.querySelector('#txtUsername') && document.querySelector('#txtPassword')) {
-    document.querySelector('#txtUsername').value = nav.nim || '';
-    document.querySelector('#txtPassword').value = nav.password || '';
-    if (nav.gemini && document.querySelector('#txtCaptcha')) {
-      document.querySelector('#txtCaptcha').value = nav.gemini;
-    }
-    document.querySelector('#MainContent_btnLogin').click();
-    return true;
-  }
-  return false;
+  // SECURITY FIX: Get credentials from chrome.storage.local instead of nav object
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['sia_nim', 'sia_password', 'sia_gemini'], (result) => {
+      if (document.querySelector('#txtUsername') && document.querySelector('#txtPassword')) {
+        document.querySelector('#txtUsername').value = result.sia_nim || '';
+        document.querySelector('#txtPassword').value = result.sia_password || '';
+        if (result.sia_gemini && document.querySelector('#txtCaptcha')) {
+          document.querySelector('#txtCaptcha').value = result.sia_gemini;
+        }
+        document.querySelector('#MainContent_btnLogin').click();
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+  });
 }
 
 async function stepRoleSelection() {
@@ -91,7 +98,8 @@ async function stepCourseDetail(nav) {
       for (const link of links) {
         if (normalize(link.textContent).includes(normalize(nav.pengumpulan))) {
           link.click();
-          localStorage.removeItem('sia_nav_target');
+          // SECURITY FIX: Use chrome.storage.local instead of localStorage
+          chrome.storage.local.remove('sia_nav_target');
           return true;
         }
       }
@@ -101,7 +109,7 @@ async function stepCourseDetail(nav) {
 }
 
 async function main() {
-  const nav = getNavTarget();
+  const nav = await getNavTarget();
   if (!nav || !nav.kode || !nav.pertemuan || !nav.pengumpulan) return;
   const url = window.location.href;
   if (/Page_Login\.aspx/i.test(url)) {

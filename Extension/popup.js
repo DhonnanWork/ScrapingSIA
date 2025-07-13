@@ -1,26 +1,32 @@
 // --- GIST DATA FETCHING LOGIC ---
 
 async function loadAllCourseData() {
-  const GIST_RAW_URL = 'https://gist.githubusercontent.com/DhonnanWork/16c307074f0e47ece82b500262347d75/raw/77a275a98279a415652a5b89e481929d0ff7102f/courses_data.json';
+  // SECURITY FIX: Use local API instead of mutable Gist
+  const API_BASE_URL = 'http://localhost:5000'; // Change this to your production API URL
+  const API_URL = `${API_BASE_URL}/api/courses`;
 
   try {
-    console.log(`Fetching course data from Gist...`);
-    const response = await fetch(GIST_RAW_URL, { cache: 'no-store' });
+    console.log(`Fetching course data from secure API...`);
+    const response = await fetch(API_URL, { 
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch data from Gist. Status: ${response.status}`);
+      throw new Error(`Failed to fetch data from API. Status: ${response.status}`);
     }
 
-    // Fetch as plain text first, then manually parse. This is more robust.
-    const textData = await response.text();
-    const coursesData = JSON.parse(textData);
+    // Parse JSON response directly
+    const coursesData = await response.json();
     
-    console.log(`Successfully loaded and parsed data from Gist.`);
+    console.log(`Successfully loaded and parsed data from secure API.`);
     return coursesData;
 
   } catch (error) {
-    console.error('❌ Error fetching or parsing data from Gist:', error);
-    throw new Error('Failed to get or parse data. Please check the data format in the Gist.');
+    console.error('❌ Error fetching or parsing data from API:', error);
+    throw new Error('Failed to get or parse data. Please check the API connection and data format.');
   }
 }
 
@@ -124,20 +130,17 @@ function makeBlueLink(text, url) {
 }
 
 function storeNavigationTargetAndOpenLogin(courseInfo, pertemuanKey, pengumpulanTitle) {
-  // Get credentials from localStorage (set by user in Show More page)
-  const nim = localStorage.getItem('sia_nim') || '';
-  const password = localStorage.getItem('sia_password') || '';
-  const gemini = localStorage.getItem('sia_gemini') || '';
+  // SECURITY FIX: Use chrome.storage.local instead of localStorage for sensitive data
   const navTarget = {
     kode: courseInfo.kode,
     pertemuan: pertemuanKey,
-    pengumpulan: pengumpulanTitle,
-    nim,
-    password,
-    gemini
+    pengumpulan: pengumpulanTitle
   };
-  localStorage.setItem('sia_nav_target', JSON.stringify(navTarget));
-  window.open('https://sia.polytechnic.astra.ac.id/Page_Pelaksanaan_Aktivitas_Pembelajaran.aspx', '_blank');
+  
+  // Store navigation target without credentials
+  chrome.storage.local.set({ 'sia_nav_target': navTarget }, () => {
+    window.open('https://sia.polytechnic.astra.ac.id/Page_Pelaksanaan_Aktivitas_Pembelajaran.aspx', '_blank');
+  });
 }
 
 function makePengumpulanLink(pengumpulanTitle, courseInfo, pertemuanKey, disabled = false) {

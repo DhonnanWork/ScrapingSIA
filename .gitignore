@@ -1,5 +1,7 @@
 # Environment variables
 .env
+.secrets
+.pem
 
 # Python cache
 __pycache__/
@@ -15,6 +17,7 @@ __pycache__/
 *.swp
 captcha.png
 critical_error_page.png
+project_snapshot.txt
 
 # Browser extension build files
 *.crx
