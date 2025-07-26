@@ -1,122 +1,110 @@
-// --- GIST DATA FETCHING LOGIC ---
+const CACHE_KEY = 'courses_data_cache';
+const TUGAS_CHECK_KEY = 'tugas_checkmarks';
 
 async function loadAllCourseData() {
-  // SECURITY FIX: Use local API instead of mutable Gist
-  const API_BASE_URL = 'http://localhost:5000'; // Change this to your production API URL
-  const API_URL = `${API_BASE_URL}/api/courses`;
-
-  try {
-    console.log(`Fetching course data from secure API...`);
-    const response = await fetch(API_URL, { 
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json'
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(CACHE_KEY, (result) => {
+      if (chrome.runtime.lastError) {
+        return reject(new Error(chrome.runtime.lastError.message));
+      }
+      if (result[CACHE_KEY] && result[CACHE_KEY].data) {
+        console.log('Loaded data from cache for popup.');
+        resolve(result[CACHE_KEY].data);
+      } else {
+        reject(new Error('Data not cached yet. Please wait a moment or check background script logs.'));
       }
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch data from API. Status: ${response.status}`);
-    }
-
-    // Parse JSON response directly
-    const coursesData = await response.json();
-    
-    console.log(`Successfully loaded and parsed data from secure API.`);
-    return coursesData;
-
-  } catch (error) {
-    console.error('❌ Error fetching or parsing data from API:', error);
-    throw new Error('Failed to get or parse data. Please check the API connection and data format.');
-  }
-}
-
-function getLastWeekMonday(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  // Monday = 1, Sunday = 0
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1) - 7;
-  return new Date(d.setDate(diff));
-}
-
-function isInLastWeek(isoDate) {
-  const now = new Date();
-  const lastMonday = getLastWeekMonday(now);
-  const thisMonday = new Date(lastMonday);
-  thisMonday.setDate(lastMonday.getDate() + 7);
-  const d = new Date(isoDate);
-  return d >= lastMonday && d < thisMonday;
-}
-
-function isInLastMonthOrFuture(isoDate) {
-  if (!isoDate) return false;
-  const now = new Date();
-  const d = new Date(isoDate);
-  const oneMonthAgo = new Date(now);
-  oneMonthAgo.setMonth(now.getMonth() - 1);
-  return d >= oneMonthAgo || d > now;
+  });
 }
 
 function isFuture(isoDate) {
-  if (!isoDate) return false;
-  const now = new Date();
-  const d = new Date(isoDate);
-  return d > now;
+  return isoDate && new Date(isoDate) > new Date();
 }
 
 function parseDeadline(deadlineStr) {
-  // Example: [Batas Waktu Pengumpulan Tugas : Jumat, 4 Juli 2025 | 23:55 WIB]
   const match = deadlineStr && deadlineStr.match(/(\d{1,2}) ([A-Za-z]+) (\d{4}) \| (\d{2}):(\d{2})/);
-  if (match) {
-    const [_, day, month, year, hour, minute] = match;
-    const monthMap = {
-      'Januari': 0, 'Februari': 1, 'Maret': 2, 'April': 3, 'Mei': 4, 'Juni': 5,
-      'Juli': 6, 'Agustus': 7, 'September': 8, 'Oktober': 9, 'November': 10, 'Desember': 11
-    };
-    const m = monthMap[month];
-    if (m !== undefined) {
-      return new Date(Number(year), m, Number(day), Number(hour), Number(minute));
-    }
-  }
-  return null;
+  if (!match) return null;
+  const [_, day, month, year, hour, minute] = match;
+  const monthMap = { 'Januari': 0, 'Februari': 1, 'Maret': 2, 'April': 3, 'Mei': 4, 'Juni': 5, 'Juli': 6, 'Agustus': 7, 'September': 8, 'Oktober': 9, 'November': 10, 'Desember': 11 };
+  const m = monthMap[month];
+  return m !== undefined ? new Date(Number(year), m, Number(day), Number(hour), Number(minute)) : null;
 }
 
 function isDeadlineActive(deadlineStr) {
   const deadline = parseDeadline(deadlineStr);
-  if (!deadline) return false;
-  return deadline > new Date();
+  return deadline ? deadline > new Date() : false;
+}
+
+function getTugasKey(course, pertemuanKey, tugas) {
+  return `${course.course_info.kode}__${pertemuanKey}__${tugas.pengumpulan_title || tugas.title}`;
+}
+
+function makeCheckmark(checked, onClick) {
+  const span = document.createElement('span');
+  span.className = 'tugas-checkmark';
+  span.textContent = checked ? '✓' : '☐';
+  span.title = checked ? 'Mark as incomplete' : 'Mark as complete';
+  span.onclick = (e) => {
+    e.stopPropagation();
+    onClick(!checked);
+  };
+  return span;
+}
+
+function makePengumpulanRow(tugas, course, pertemuanKey, checkmarks, updateCheckmark) {
+  const row = document.createElement('div');
+  row.className = 'tugas-row';
+  const label = document.createElement('span');
+  label.textContent = `${tugas.pengumpulan_title || tugas.title} - ${course.course_info.nama}`;
+  label.className = 'tugas-label';
+  row.appendChild(label);
+  row.appendChild(makeCheckmark(!!checkmarks[getTugasKey(course, pertemuanKey, tugas)], (checked) => {
+    checkmarks[getTugasKey(course, pertemuanKey, tugas)] = checked;
+    chrome.storage.local.set({ [TUGAS_CHECK_KEY]: checkmarks });
+    updateCheckmark();
+  }));
+  return row;
 }
 
 function renderDropdown(title, items, autoExpand = false) {
   const container = document.createElement('div');
   container.className = 'dropdown';
+
   const btn = document.createElement('button');
   btn.className = 'dropdown-btn gray';
-  btn.innerHTML = `<span class="dropdown-arrow">▼</span> ${title}`;
+
+  const arrowSpan = document.createElement('span');
+  arrowSpan.className = 'dropdown-arrow';
+  btn.appendChild(arrowSpan);
+  btn.appendChild(document.createTextNode(` ${title}`));
+
   const content = document.createElement('div');
   content.className = 'dropdown-content';
-  items.forEach((item, idx) => {
-    content.appendChild(item);
-    if (idx < items.length - 1) {
-      const hr = document.createElement('div');
-      hr.className = 'row-separator';
-      content.appendChild(hr);
-    }
-  });
-  container.appendChild(btn);
-  container.appendChild(content);
+
+  if (items.length === 0) {
+    const noItem = document.createElement('div');
+    noItem.textContent = 'No items to display.';
+    noItem.style.padding = '8px';
+    content.appendChild(noItem);
+  } else {
+    items.forEach((item, idx) => {
+      content.appendChild(item);
+      if (idx < items.length - 1) {
+        content.appendChild(document.createElement('div')).className = 'row-separator';
+      }
+    });
+  }
+
+  container.append(btn, content);
+
   let expanded = autoExpand;
-  function updateArrow() {
-    btn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
-  }
-  btn.onclick = () => {
-    expanded = !expanded;
+  const updateState = () => {
+    arrowSpan.textContent = expanded ? '▲' : '▼';
     content.classList.toggle('show', expanded);
-    updateArrow();
   };
-  if (autoExpand) {
-    content.classList.add('show');
-    updateArrow();
-  }
+
+  btn.onclick = () => { expanded = !expanded; updateState(); };
+  updateState();
   return container;
 }
 
@@ -129,98 +117,80 @@ function makeBlueLink(text, url) {
   return a;
 }
 
-function storeNavigationTargetAndOpenLogin(courseInfo, pertemuanKey, pengumpulanTitle) {
-  // SECURITY FIX: Use chrome.storage.local instead of localStorage for sensitive data
-  const navTarget = {
-    kode: courseInfo.kode,
-    pertemuan: pertemuanKey,
-    pengumpulan: pengumpulanTitle
-  };
-  
-  // Store navigation target without credentials
-  chrome.storage.local.set({ 'sia_nav_target': navTarget }, () => {
-    window.open('https://sia.polytechnic.astra.ac.id/Page_Pelaksanaan_Aktivitas_Pembelajaran.aspx', '_blank');
-  });
-}
-
-function makePengumpulanLink(pengumpulanTitle, courseInfo, pertemuanKey, disabled = false) {
+function makePengumpulanLink(tugas, course, pertemuanKey, checkmarks, updateCheckmark) {
+  const row = document.createElement('div');
+  row.className = 'tugas-row';
   const a = document.createElement('a');
-  a.textContent = `${pengumpulanTitle} - ${courseInfo.nama}`;
-  a.href = '#';
-  a.className = disabled ? 'disabled-link' : 'blue-link';
-  if (disabled) {
-    a.title = 'Open Show More page to use this feature';
-    a.style.pointerEvents = 'none';
-    a.style.color = '#222';
-    a.style.textDecoration = 'none';
-    a.style.cursor = 'not-allowed';
-  } else {
-    a.onclick = (e) => {
-      e.preventDefault();
-      storeNavigationTargetAndOpenLogin(courseInfo, pertemuanKey, pengumpulanTitle);
-    };
-  }
-  return a;
+  a.textContent = `${tugas.pengumpulan_title || tugas.title} - ${course.course_info.nama}`;
+  // Make it a direct link to the SIA login page that opens in a new tab.
+  a.href = 'https://sia.polytechnic.astra.ac.id/sso/Page_Login.aspx';
+  a.target = '_blank'; // Open in a new tab
+  a.className = 'blue-link tugas-label';
+  // No complex onclick handler needed anymore.
+  row.appendChild(a);
+  row.appendChild(makeCheckmark(!!checkmarks[getTugasKey(course, pertemuanKey, tugas)], (checked) => {
+    checkmarks[getTugasKey(course, pertemuanKey, tugas)] = checked;
+    chrome.storage.local.set({ [TUGAS_CHECK_KEY]: checkmarks });
+    updateCheckmark();
+  }));
+  return row;
 }
-
-
 
 function render() {
   const root = document.getElementById('sia-quick-root');
-  root.innerHTML = 'Loading...';
+  root.textContent = 'Loading...';
 
-  loadAllCourseData().then(data => {
-    if (!Array.isArray(data)) {
-      throw new Error("Data format error: The final data is not an array.");
-    }
-    const courses = data.filter(item => typeof item === 'object' && item !== null && item.course_info);
-    
-    const now = new Date();
+  Promise.all([
+    loadAllCourseData(),
+    new Promise(res => chrome.storage.local.get(TUGAS_CHECK_KEY, r => res(r[TUGAS_CHECK_KEY] || {})))
+  ]).then(([data, checkmarks]) => {
+    const courses = (data || []).filter(item => item && item.course_info);
     const pertemuanFiles = [];
     const activePengumpulan = [];
-    
+
+    const updateCheckmark = () => {
+      chrome.storage.local.get(TUGAS_CHECK_KEY, (result) => {
+        render();
+      });
+    };
+
     courses.forEach(course => {
-      if (!course || !course.course_info) return;
       const courseName = course.course_info.nama;
       Object.entries(course.pertemuan || {}).forEach(([pertemuanKey, pertemuan]) => {
-        const date_iso = Array.isArray(pertemuan.date_iso) ? pertemuan.date_iso[0] : pertemuan.date_iso;
-        if (!isInLastMonthOrFuture(date_iso)) return;
-
         const hasActiveTugas = (pertemuan.tugas || []).some(t => isDeadlineActive(t.deadline));
-        const pertemuanIsFuture = isFuture(date_iso);
+        const pertemuanIsFuture = isFuture(Array.isArray(pertemuan.date_iso) ? pertemuan.date_iso : pertemuan.date_iso);
 
         if (hasActiveTugas || pertemuanIsFuture) {
           (pertemuan.files || []).forEach(f => {
-            if (f.title && (/[\[BAHAN AJAR\]]/i.test(f.title) || /[\[Tugas\]]/i.test(f.title)) && !/Detail Aktivitas Pembelajaran/i.test(f.title) && !/[\[Batas Waktu Pengumpulan Tugas]/i.test(f.title)) {
+            if (f.title && !/Detail Aktivitas Pembelajaran/i.test(f.title) && !/[\[Batas Waktu Pengumpulan Tugas]/i.test(f.title)) {
               pertemuanFiles.push(makeBlueLink(`${f.title} - ${courseName}`, f.url));
             }
           });
-          (pertemuan.tugas || []).forEach(t => {
-            // TYPO FIX: Changed f.title to t.title in the next two lines
-            if (t.title && (/[\[BAHAN AJAR\]]/i.test(t.title) || /[\[Tugas\]]/i.test(t.title)) && !/Detail Aktivitas Pembelajaran/i.test(t.title) && !/[\[Batas Waktu Pengumpulan Tugas]/i.test(t.title)) {
-              pertemuanFiles.push(makeBlueLink(`${t.title} - ${courseName}`, t.url));
-            }
-          });
         }
+
         (pertemuan.tugas || []).forEach(t => {
-          if ((t.active || isDeadlineActive(t.deadline)) && t.pengumpulan_title && !/Detail Aktivitas Pembelajaran/i.test(t.title)) {
-            activePengumpulan.push(makePengumpulanLink(t.pengumpulan_title, course.course_info, pertemuanKey, false));
+          if ((t.active || isDeadlineActive(t.deadline)) && t.pengumpulan_title) {
+            activePengumpulan.push(makePengumpulanLink(t, course, pertemuanKey, checkmarks, updateCheckmark));
           }
         });
       });
     });
 
     root.innerHTML = '';
-    root.appendChild(renderDropdown('Bahan Ajar & Tugas (Pertemuan dengan Pengumpulan Aktif/Future)', pertemuanFiles, true));
-    root.appendChild(renderDropdown('Active Pengumpulan Tugas', activePengumpulan, true));
-
+    root.appendChild(renderDropdown('Bahan Ajar & Tugas (Pengumpulan Aktif/Future)', pertemuanFiles, true));
+    root.appendChild(renderDropdown('Pengumpulan Tugas Aktif', activePengumpulan, true));
   }).catch(err => {
-    root.innerHTML = `<div class='warning'>${err.message}</div>`;
+    root.innerHTML = '';
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'warning';
+    warningDiv.textContent = err.message;
+    root.appendChild(warningDiv);
   });
 }
 
-document.getElementById('show-more-btn').onclick = () => {
-  window.open('show_more.html', '_blank');
-};
-
-render();
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('show-more-btn').onclick = () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('show_more.html') });
+  };
+  render();
+});

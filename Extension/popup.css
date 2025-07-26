@@ -51,16 +51,6 @@ button:hover, .dropdown-btn:hover {
   margin-top: 12px;
   font-weight: bold;
 }
-.api-url-input {
-  margin-bottom: 10px;
-}
-.api-url-input input {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 1em;
-}
 .warning {
   color: #fff;
   background: #d9534f;
@@ -100,4 +90,26 @@ button:hover, .dropdown-btn:hover {
   cursor: not-allowed !important;
   pointer-events: none !important;
   opacity: 0.7;
+}
+.tugas-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.tugas-label {
+  flex: 1;
+  margin-right: 8px;
+  word-break: break-word;
+}
+.tugas-checkmark {
+  cursor: pointer;
+  font-size: 1.2em;
+  user-select: none;
+  color: #0074d9;
+  margin-left: 8px;
+  transition: color 0.2s;
+}
+.tugas-checkmark:hover {
+  color: #005fa3;
 } 

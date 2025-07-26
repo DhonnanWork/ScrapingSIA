@@ -1,291 +1,73 @@
-// --- GIST DATA FETCHING LOGIC ---
+const CACHE_KEY = 'courses_data_cache';
+const TUGAS_CHECK_KEY = 'tugas_checkmarks';
 
 async function loadAllCourseData() {
-  const GIST_RAW_URL = 'https://gist.githubusercontent.com/DhonnanWork/16c307074f0e47ece82b500262347d75/raw/77a275a98279a415652a5b89e481929d0ff7102f/courses_data.json';
-
-  try {
-    console.log(`Fetching course data from Gist...`);
-    const response = await fetch(GIST_RAW_URL, { cache: 'no-store' });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch data from Gist. Status: ${response.status}`);
-    }
-
-    // Fetch as plain text first, then manually parse. This is more robust.
-    const textData = await response.text();
-    const coursesData = JSON.parse(textData);
-    
-    console.log(`Successfully loaded and parsed data from Gist.`);
-    return coursesData;
-
-  } catch (error) {
-    console.error('❌ Error fetching or parsing data from Gist:', error);
-    throw new Error('Failed to get or parse data. Please check the data format in the Gist.');
-  }
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(CACHE_KEY, (result) => {
+      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+      if (result[CACHE_KEY] && result[CACHE_KEY].data) {
+        resolve(result[CACHE_KEY].data);
+      } else {
+        reject(new Error('Data not cached. Please wait for the background fetch to complete.'));
+      }
+    });
+  });
 }
 
-function isInLastMonth(isoDate) {
-  if (!isoDate) return false;
-  const now = new Date();
-  const d = new Date(isoDate);
-  const oneMonthAgo = new Date(now);
-  oneMonthAgo.setMonth(now.getMonth() - 1);
-  return d >= oneMonthAgo && d <= now;
+function getTugasKey(course, pertemuanKey, tugas) {
+  return `${course.course_info.kode}__${pertemuanKey}__${tugas.pengumpulan_title || tugas.title}`;
 }
 
-function parseDeadline(deadlineStr) {
-  // Example: [Batas Waktu Pengumpulan Tugas : Jumat, 4 Juli 2025 | 23:55 WIB]
-  const match = deadlineStr && deadlineStr.match(/(\d{1,2}) ([A-Za-z]+) (\d{4}) \| (\d{2}):(\d{2})/);
-  if (match) {
-    const [_, day, month, year, hour, minute] = match;
-    const monthMap = {
-      'Januari': 0, 'Februari': 1, 'Maret': 2, 'April': 3, 'Mei': 4, 'Juni': 5,
-      'Juli': 6, 'Agustus': 7, 'September': 8, 'Oktober': 9, 'November': 10, 'Desember': 11
-    };
-    const m = monthMap[month];
-    if (m !== undefined) {
-      return new Date(Number(year), m, Number(day), Number(hour), Number(minute));
-    }
-  }
-  return null;
-}
-
-function isDeadlineActive(deadlineStr) {
-  const deadline = parseDeadline(deadlineStr);
-  if (!deadline) return false;
-  return deadline > new Date();
-}
-
-function makeBlueLink(text, url) {
-  const a = document.createElement('a');
-  a.textContent = text;
-  a.href = url;
-  a.target = '_blank';
-  a.className = 'blue-link';
-  return a;
-}
-
-function storeNavigationTargetAndOpenLogin(courseInfo, pertemuanKey, pengumpulanTitle) {
-  // Get credentials from localStorage (set by user in Show More page)
-  const nim = localStorage.getItem('sia_nim') || '';
-  const password = localStorage.getItem('sia_password') || '';
-  const gemini = localStorage.getItem('sia_gemini') || '';
-  const navTarget = {
-    kode: courseInfo.kode,
-    pertemuan: pertemuanKey,
-    pengumpulan: pengumpulanTitle,
-    nim,
-    password,
-    gemini
+function makeCheckmark(checked, onClick) {
+  const span = document.createElement('span');
+  span.className = 'tugas-checkmark';
+  span.textContent = checked ? '✓' : '☐';
+  span.title = checked ? 'Mark as incomplete' : 'Mark as complete';
+  span.onclick = (e) => {
+    e.stopPropagation();
+    onClick(!checked);
   };
-  localStorage.setItem('sia_nav_target', JSON.stringify(navTarget));
-  window.open('https://sia.polytechnic.astra.ac.id/Page_Pelaksanaan_Aktivitas_Pembelajaran.aspx', '_blank');
+  return span;
 }
 
-function makePengumpulanLink(pengumpulanTitle, courseInfo, pertemuanKey) {
+function makePengumpulanRow(tugas, course, pertemuanKey, checkmarks, updateCheckmark) {
+  const row = document.createElement('div');
+  row.className = 'tugas-row';
+  const label = document.createElement('span');
+  label.textContent = tugas.pengumpulan_title || tugas.title;
+  label.className = 'tugas-label';
+  row.appendChild(label);
+  row.appendChild(makeCheckmark(!!checkmarks[getTugasKey(course, pertemuanKey, tugas)], (checked) => {
+    checkmarks[getTugasKey(course, pertemuanKey, tugas)] = checked;
+    chrome.storage.local.set({ [TUGAS_CHECK_KEY]: checkmarks });
+    updateCheckmark();
+  }));
+  return row;
+}
+
+function makePengumpulanLink(tugas, course, pertemuanKey, checkmarks, updateCheckmark) {
+  const row = document.createElement('div');
+  row.className = 'tugas-row';
   const a = document.createElement('a');
-  a.textContent = `${pengumpulanTitle} - ${safeCourseName(courseInfo)}`;
+  a.textContent = `${tugas.pengumpulan_title || tugas.title} - ${course.course_info.nama}`;
+  // Make it a direct link to the SIA login page that opens in a new tab.
   a.href = 'https://sia.polytechnic.astra.ac.id/sso/Page_Login.aspx';
-  a.target = '_blank';
-  a.className = 'blue-link';
-  return a;
+  a.target = '_blank'; // Open in a new tab
+  a.className = 'blue-link tugas-label';
+  // No complex onclick handler needed anymore.
+  row.appendChild(a);
+  row.appendChild(makeCheckmark(!!checkmarks[getTugasKey(course, pertemuanKey, tugas)], (checked) => {
+    checkmarks[getTugasKey(course, pertemuanKey, tugas)] = checked;
+    chrome.storage.local.set({ [TUGAS_CHECK_KEY]: checkmarks });
+    updateCheckmark();
+  }));
+  return row;
 }
 
-function renderCourseDropdown(course) {
-  const container = document.createElement('div');
-  container.className = 'dropdown';
-  const btn = document.createElement('button');
-  btn.className = 'dropdown-btn gray';
-  btn.innerHTML = `<span class="dropdown-arrow">▼</span> ${safeCourseKode(course)} - ${safeCourseName(course)}`;
-  const content = document.createElement('div');
-  content.className = 'dropdown-content';
-  // Sort pertemuan by date_iso descending
-  const pertemuanArr = Object.entries(course.pertemuan || {}).sort((a, b) => {
-    const dA = (Array.isArray(a[1].date_iso) ? a[1].date_iso[0] : a[1].date_iso || '').toString();
-    const dB = (Array.isArray(b[1].date_iso) ? b[1].date_iso[0] : b[1].date_iso || '').toString();
-    return dB.localeCompare(dA);
-  });
-  pertemuanArr.forEach(([pertemuanKey, pertemuan], idx) => {
-    // REMOVE the isInLastMonth filter so all pertemuan are shown
-    // if (!isInLastMonth(pertemuan.date_iso)) return;
-    const row = document.createElement('div');
-    row.className = 'pertemuan-row';
-    // Title
-    const title = document.createElement('div');
-    title.textContent = pertemuanKey.replace(/Pertemuan(\d+)/, 'Pertemuan $1');
-    title.className = 'pertemuan-title';
-    row.appendChild(title);
-    // Files
-    (pertemuan.files || []).forEach(f => {
-      if (f.title &&
-          (/\[BAHAN AJAR\]/i.test(f.title) || /\[Tugas\]/i.test(f.title)) &&
-          !/Detail Aktivitas Pembelajaran/i.test(f.title) &&
-          !/\[Batas Waktu Pengumpulan Tugas/i.test(f.title)) {
-        row.appendChild(makeBlueLink(`${f.title} - ${safeCourseName(course)}`, f.url));
-        const hr = document.createElement('div');
-        hr.className = 'row-separator';
-        row.appendChild(hr);
-      }
-    });
-    // Tugas
-    (pertemuan.tugas || []).forEach(t => {
-      if (t.title &&
-          (/\[BAHAN AJAR\]/i.test(t.title) || /\[Tugas\]/i.test(t.title)) &&
-          !/Detail Aktivitas Pembelajaran/i.test(t.title) &&
-          !/\[Batas Waktu Pengumpulan Tugas/i.test(t.title)) {
-        row.appendChild(makeBlueLink(`${t.title} - ${safeCourseName(course)}`, t.url));
-        const hr = document.createElement('div');
-        hr.className = 'row-separator';
-        row.appendChild(hr);
-      }
-    });
-    content.appendChild(row);
-    if (idx < pertemuanArr.length - 1) {
-      const hr = document.createElement('div');
-      hr.className = 'row-separator';
-      content.appendChild(hr);
-    }
-  });
-  container.appendChild(btn);
-  container.appendChild(content);
-  let expanded = false;
-  function updateArrow() {
-    btn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
-  }
-  btn.onclick = () => {
-    expanded = !expanded;
-    content.classList.toggle('show', expanded);
-    updateArrow();
-  };
-  updateArrow();
-  return container;
-}
-
-function renderPengumpulanDropdown(allCourses) {
-  // Collect all active pengumpulan tugas, match popup logic: pertemuan in last month or future, tugas active
-  const allPengumpulan = [];
-  allCourses.forEach(course => {
-    if (!course || !course.course_info) return;
-    Object.entries(course.pertemuan || {}).forEach(([pertemuanKey, pertemuan]) => {
-      const date_iso = Array.isArray(pertemuan.date_iso) ? pertemuan.date_iso[0] : pertemuan.date_iso;
-      if (!isInLastMonth(date_iso) && !isFuture(date_iso)) return;
-      (pertemuan.tugas || []).forEach(t => {
-        if ((t.active || isDeadlineActive(t.deadline)) && t.pengumpulan_title && !/Detail Aktivitas Pembelajaran/i.test(t.title)) {
-          allPengumpulan.push({
-            ...t,
-            pertemuanKey,
-            date_iso: date_iso || '',
-            courseName: safeCourseName(course),
-            courseInfo: course.course_info // pass the correct course info
-          });
-        }
-      });
-    });
-  });
-  allPengumpulan.sort((a, b) => (a.date_iso || '').localeCompare(b.date_iso || ''));
-  const container = document.createElement('div');
-  container.className = 'dropdown';
-  const btn = document.createElement('button');
-  btn.className = 'dropdown-btn gray';
-  btn.innerHTML = `<span class="dropdown-arrow">▼</span> Pengumpulan Tugas Aktif`;
-  const content = document.createElement('div');
-  content.className = 'dropdown-content';
-  allPengumpulan.forEach((t, idx) => {
-    const row = document.createElement('div');
-    row.className = 'pertemuan-row';
-    const title = document.createElement('div');
-    title.textContent = `${t.pertemuanKey.replace(/Pertemuan(\d+)/, 'Pertemuan $1')} - ${t.pengumpulan_title} - ${safeCourseName({course_info: t.courseInfo})}`;
-    title.className = 'pertemuan-title';
-    row.appendChild(title);
-    row.appendChild(makePengumpulanLink(t.pengumpulan_title, {course_info: t.courseInfo}, t.pertemuanKey));
-    content.appendChild(row);
-    if (idx < allPengumpulan.length - 1) {
-      const hr = document.createElement('div');
-      hr.className = 'row-separator';
-      content.appendChild(hr);
-    }
-  });
-  container.appendChild(btn);
-  container.appendChild(content);
-  let expanded = true;
-  function updateArrow() {
-    btn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
-  }
-  btn.onclick = () => {
-    expanded = !expanded;
-    content.classList.toggle('show', expanded);
-    updateArrow();
-  };
-  content.classList.add('show');
-  updateArrow();
-  return container;
-}
-
-function isFuture(isoDate) {
-  if (!isoDate) return false;
-  const now = new Date();
-  const d = new Date(isoDate);
-  return d > now;
-}
-
-function render() {
-  const root = document.getElementById('show-more-root');
-  root.innerHTML = 'Loading...'; // Display a loading message initially
-
-  loadAllCourseData().then(data => {
-    // FIX: Add final validation and filtering logic
-    if (!Array.isArray(data)) {
-      throw new Error("Data format error: The final data is not an array.");
-    }
-    const courses = data.filter(item => typeof item === 'object' && item !== null && item.course_info);
-
-    // Clear the loading message and prepare for rendering
-    root.innerHTML = '';
-
-    // Create a container for all course dropdowns
-    const fileDropdown = document.createElement('div');
-    fileDropdown.className = 'dropdown';
-    const fileBtn = document.createElement('button');
-    fileBtn.className = 'dropdown-btn gray';
-    fileBtn.innerHTML = `<span class="dropdown-arrow">▼</span> File - File Pelajaran`;
-    const fileContent = document.createElement('div');
-    fileContent.className = 'dropdown-content show'; // Show by default
-
-    // Populate the container
-    courses.forEach(course => {
-      if (!course || !course.course_info) return; // Skip if data is malformed
-      fileContent.appendChild(renderCourseDropdown(course));
-    });
-
-    fileDropdown.appendChild(fileBtn);
-    fileDropdown.appendChild(fileContent);
-
-    // Event listener for the main dropdown toggle
-    let expanded = true;
-    function updateArrow() {
-      fileBtn.querySelector('.dropdown-arrow').innerHTML = expanded ? '▲' : '▼';
-    }
-    fileBtn.onclick = () => {
-      expanded = !expanded;
-      fileContent.classList.toggle('show', expanded);
-      updateArrow();
-    };
-    updateArrow(); // Set initial arrow state
-
-    // Append the fully constructed elements to the DOM
-    root.appendChild(fileDropdown);
-    root.appendChild(renderPengumpulanDropdown(courses));
-
-  }).catch(err => {
-    // Display error message if the promise fails
-    root.innerHTML = `<div class='warning'>${err.message}</div>`;
-  });
-}
-
-// Add dark mode toggle
-function applyDarkMode(isDark) {
-  document.body.classList.toggle('dark-mode', isDark);
-  localStorage.setItem('sia_dark_mode', isDark ? '1' : '0');
+// --- DARK MODE ---
+function setDarkMode(enabled) {
+  document.body.classList.toggle('dark-mode', enabled);
+  localStorage.setItem('sia_dark_mode', enabled ? '1' : '0');
 }
 
 function renderDarkModeToggle() {
@@ -295,33 +77,134 @@ function renderDarkModeToggle() {
   toggle.style.marginRight = '12px';
   toggle.onclick = () => {
     const isDark = !document.body.classList.contains('dark-mode');
-    applyDarkMode(isDark);
+    setDarkMode(isDark);
     toggle.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
   };
   // Set initial state
-  const isDark = localStorage.getItem('sia_dark_mode') === '1';
-  applyDarkMode(isDark);
+  const isDark = true; // default dark mode
+  setDarkMode(isDark);
   toggle.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
   document.body.insertBefore(toggle, document.body.firstChild);
 }
 
+// --- TUGAS RENDERING ---
+function renderCourseDropdown(course, checkmarks, updateCheckmark, tugasKeysInGlobal) {
+  const container = document.createElement('div');
+  container.className = 'dropdown';
+  const btn = document.createElement('button');
+  btn.className = 'dropdown-btn gray';
+  const arrowSpan = document.createElement('span');
+  arrowSpan.className = 'dropdown-arrow';
+  arrowSpan.textContent = '\u25bc';
+  btn.append(arrowSpan, ` ${course.course_info.kode} - ${course.course_info.nama}`);
 
+  const content = document.createElement('div');
+  content.className = 'dropdown-content';
+  const pertemuanArr = Object.entries(course.pertemuan || {}).sort((a, b) => String(b[0]).localeCompare(String(a[0])));
 
-function setupInputSavers() {
-  // Remove NIM, PASSWORD, GEMINI inputs (already removed from HTML)
+  pertemuanArr.forEach(([pertemuanKey, pertemuan], idx) => {
+    const row = document.createElement('div');
+    row.className = 'pertemuan-row';
+    const title = document.createElement('div');
+    title.className = 'pertemuan-title';
+    title.textContent = pertemuanKey.replace(/_/g, ' ');
+    row.appendChild(title);
+    (pertemuan.files || []).forEach(f => {
+      const link = document.createElement('a');
+      link.textContent = f.title;
+      link.href = f.url;
+      link.target = '_blank';
+      link.className = 'blue-link';
+      row.appendChild(link);
+    });
+    // Only render tugas here if not in global tugas section
+    (pertemuan.tugas || []).forEach(t => {
+      if (!tugasKeysInGlobal.has(getTugasKey(course, pertemuanKey, t))) {
+        row.appendChild(makePengumpulanRow(t, course, pertemuanKey, checkmarks, updateCheckmark));
+      }
+    });
+    content.appendChild(row);
+    if (idx < pertemuanArr.length - 1) content.appendChild(document.createElement('div')).className = 'row-separator';
+  });
+
+  container.append(btn, content);
+  let expanded = false;
+  const updateState = () => { arrowSpan.textContent = expanded ? '\u25b2' : '\u25bc'; content.classList.toggle('show', expanded); };
+  btn.onclick = () => { expanded = !expanded; updateState(); };
+  return container;
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  renderDarkModeToggle();
-  setupInputSavers();
-  render();
-});
-
-// Defensive checks in rendering logic
-function safeCourseName(course) {
-  return (course && course.course_info && course.course_info.nama) ? course.course_info.nama : 'Unknown Course';
+function renderTugasDropdown(allCourses, checkmarks, updateCheckmark) {
+  // Collect all active pengumpulan tugas
+  const allPengumpulan = [];
+  const tugasKeys = new Set();
+  allCourses.forEach(course => {
+    if (!course || !course.course_info) return;
+    Object.entries(course.pertemuan || {}).forEach(([pertemuanKey, pertemuan]) => {
+      (pertemuan.tugas || []).forEach(t => {
+        const key = getTugasKey(course, pertemuanKey, t);
+        tugasKeys.add(key);
+        allPengumpulan.push({ tugas: t, course, pertemuanKey, key });
+      });
+    });
+  });
+  if (allPengumpulan.length === 0) return { dropdown: null, tugasKeys };
+  const container = document.createElement('div');
+  container.className = 'dropdown';
+  const btn = document.createElement('button');
+  btn.className = 'dropdown-btn gray';
+  const arrowSpan = document.createElement('span');
+  arrowSpan.className = 'dropdown-arrow';
+  arrowSpan.textContent = '\u25bc';
+  btn.append(arrowSpan, ' Pengumpulan Tugas Aktif');
+  const content = document.createElement('div');
+  content.className = 'dropdown-content';
+  allPengumpulan.forEach((item, idx) => {
+    content.appendChild(makePengumpulanLink(item.tugas, item.course, item.pertemuanKey, checkmarks, updateCheckmark));
+    if (idx < allPengumpulan.length - 1) content.appendChild(document.createElement('div')).className = 'row-separator';
+  });
+  container.append(btn, content);
+  let expanded = true;
+  const updateState = () => { arrowSpan.textContent = expanded ? '\u25b2' : '\u25bc'; content.classList.toggle('show', expanded); };
+  btn.onclick = () => { expanded = !expanded; updateState(); };
+  updateState();
+  return { dropdown: container, tugasKeys };
 }
-function safeCourseKode(course) {
-  return (course && course.course_info && course.course_info.kode) ? course.course_info.kode : '';
-} 
+
+function render(courses, checkmarks) {
+  const root = document.getElementById('show-more-root');
+  root.innerHTML = '';
+  const updateCheckmark = () => {
+    chrome.storage.local.get(TUGAS_CHECK_KEY, (result) => {
+      render(courses, result[TUGAS_CHECK_KEY] || {});
+    });
+  };
+  // Add dark mode toggle and enable dark mode by default
+  if (!document.getElementById('dark-mode-toggle')) renderDarkModeToggle();
+  // Add tugas section at the top and collect keys
+  const { dropdown: tugasDropdown, tugasKeys } = renderTugasDropdown(courses, checkmarks, updateCheckmark);
+  if (tugasDropdown) root.appendChild(tugasDropdown);
+  // Then render all course dropdowns, skipping tugas already in global section
+  courses.forEach(course => root.appendChild(renderCourseDropdown(course, checkmarks, updateCheckmark, tugasKeys || new Set())));
+}
+
+function renderError(err) {
+  const root = document.getElementById('show-more-root');
+  root.innerHTML = '';
+  const warningDiv = document.createElement('div');
+  warningDiv.className = 'warning';
+  warningDiv.textContent = err.message;
+  root.appendChild(warningDiv);
+}
+
+function init() {
+  Promise.all([
+    loadAllCourseData(),
+    new Promise(res => chrome.storage.local.get(TUGAS_CHECK_KEY, r => res(r[TUGAS_CHECK_KEY] || {})))
+  ]).then(([courses, checkmarks]) => {
+    render(courses, checkmarks);
+  }).catch(renderError);
+}
+
+document.addEventListener('DOMContentLoaded', init); 
 

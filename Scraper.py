@@ -8,6 +8,7 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 import google.generativeai as genai
 from dotenv import load_dotenv
+from PIL import Image
 
 load_dotenv()
 

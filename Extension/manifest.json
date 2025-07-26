@@ -1,31 +1,35 @@
 {
-  "manifest_version": 2,
-  "name": "SIA Quick Navigation",
-  "version": "1.0",
-  "description": "Provides quick access to SIA course materials and assignment submission pages.",
-  "homepage_url": "https://github.com/DhonnanWork/ScrapingSIA",
-  "icons": {
-    "16": "icon-16.ico",
-    "32": "icon-32.ico",
-    "48": "icon-48.ico",
-    "96": "icon-96.ico"
-  },
+  "manifest_version": 3,
+  "name": "SIA Quick Access",
+  "version": "2.0.1",
+  "description": "A simplified dashboard for the Astra Polytechnic SIA website. Features direct file downloads, assignment tracking, and one-click navigation.",
   "permissions": [
     "storage",
-    "https://gist.githubusercontent.com/*"
+    "alarms",
+    "tabs"
   ],
-  "browser_action": {
-    "default_icon": "icon-48.ico",
-    "default_title": "SIA Quick Nav",
-    "default_popup": "popup.html"
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "sia-quick-access@dhonnanwork.github"
+    }
   },
   "background": {
+    "service_worker": "background.js",
     "scripts": ["background.js"]
   },
-  "content_scripts": [
-    {
-      "matches": ["*://sia.polytechnic.astra.ac.id/*"],
-      "js": ["autonavigate.js"]
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "96": "icon-96.png"
     }
-  ]
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "96": "icon-96.png"
+  }
 }
